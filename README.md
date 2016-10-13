@@ -1,7 +1,16 @@
 # REPLICA
 > Plug & play building tool for JavaScript.
 
-Replica is intended both for development and building packages for production. 
+Replica is small and configureless build tool for most common actions you will find while developing front end JavaScript applications or libraries.
+
+#### Features
+* Include all scripts automatically inside index html file
+* Pack scripts into one file
+* Minify packed files
+* Realtime watching for added/removed files
+* Timestamp changed scripts in index html file
+* Simple embeded string syntax for requiring files/changing include order - such as "require <name>"
+
 Replica approaches more classical way of building JavaScript projects by automatic file inclusion in HTML Index file for more speedy development and instantenous build time while developing projects.
 Also supports optional custom require syntax to change include order without need to manage files yourself.
 
@@ -32,6 +41,11 @@ build-replica --input lib --input src --index index.html --watch --timestamp
 ### Production ready compilation
 ```
 build-replica --input lib --input src --index index.html --uglify --timestamp
+```
+
+### Compile library
+```
+build-replica --input lib --concat build/package.js --minify
 ```
 
 ## Custom include order
