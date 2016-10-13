@@ -414,6 +414,8 @@ function concatSources()
 
 function uglifySources(content)
 {
+	console.log("Uglifying package");
+
 	let result = uglifyJS.minify(content, { 
 		fromString: true,
 		compress: { 
@@ -592,7 +594,7 @@ function addInput(src)
 		return;
 	}
 
-	console.log("Watching input directory: " + src);
+	console.log("Input directory: " + inputSrc);
 
 	let input = new Input(inputSrc);
 	inputs.push(input);
