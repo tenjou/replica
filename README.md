@@ -45,7 +45,7 @@ build-replica --input lib --input src --index index.html --uglify --timestamp
 
 ### 4) Compile library
 ```
-build-replica --input lib --concat build/package.js --minify
+build-replica --input lib --concat build/my_package.js --uglify
 ```
 
 ## Custom include order
