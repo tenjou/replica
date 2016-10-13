@@ -58,6 +58,7 @@ Will make b.js to be included before a.js.
 
 - Help inside cmd
 - Custom input packages
+- Download url dependencies inside cache
 - Documentation generation
 
 ## License
