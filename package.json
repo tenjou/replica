@@ -1,11 +1,18 @@
 {
 	"name": "build-replica",
-	"version": "0.1.0",
+	"version": "0.1.21",
 	"description": "Plug & play building tool for JavaScript.",
 	"author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
 	"main": "replica.js",
 	"dependencies": { 
 		"uglify-js2" : "*"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/tenjou/replica"
+	},
+	"bin": {
+		"build-replica": "./bin/replica"
 	},
 	"keywords": [
 		"build",

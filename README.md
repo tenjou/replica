@@ -54,6 +54,12 @@ Will make b.js to be included before a.js.
   --uglify						Specify that concatenated file should be minified. Setting this will force --concat flag to true.
 ```
 
+## TODO
+
+- Help inside cmd
+- Custom input packages
+- Documentation generation
+
 ## License
 
 MIT License
