@@ -21,17 +21,17 @@ build-replica ./
 ```
 Equivalent to:
 ```
-build-replica --input ./ --index index.html --watch
+build-replica --input ./ --index index.html --watch --timestamp
 ```
 
 ### Customized development build
 ```
-build-replica --input lib --input src --index index.html --watch
+build-replica --input lib --input src --index index.html --watch --timestamp
 ```
 
 ### Production ready compilation
 ```
-build-replica --input lib --input src --index index.html --uglify
+build-replica --input lib --input src --index index.html --uglify --timestamp
 ```
 
 ## Custom include order
@@ -52,6 +52,7 @@ Will make b.js to be included before a.js.
   --watch						Look after file changes in set input folders.
   --concat <file=./package.js>	Specify that files should be concatenated inside one file.
   --uglify						Specify that concatenated file should be minified. Setting this will force --concat flag to true.
+  --timestamp					Add timestamp to scripts inside index file.
 ```
 
 ## TODO
