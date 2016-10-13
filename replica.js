@@ -497,22 +497,29 @@ function startWatching()
 	}, 100);	
 }
 
+function defaultInit(src)
+{
+	flags.watch = true;
+	flags.timestamp = true;
+
+	addInput(src);
+
+	const fileExist = fs.existsSync(src + "/index.html");
+	if(fileExist) {
+		addIndex(args[0] + "/index.html");
+	}	
+}
+
 function processArgs() 
 {
 	const args = process.argv.slice(2);
 	const numArgs = args.length;
 
-	if(numArgs === 1) 
-	{
-		flags.watch = true;
-		flags.timestamp = true;
-
-		addInput(args[0]);
-
-		const fileExist = fs.existsSync(args[0] + "/index.html");
-		if(fileExist) {
-			addIndex(args[0] + "/index.html");
-		}
+	if(numArgs === 1) {
+		defaultInit(args[0]);
+	}
+	else if(numArgs === 0) {
+		defaultInit("./");
 	}
 	else
 	{

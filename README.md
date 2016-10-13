@@ -17,7 +17,7 @@ npm install -g build-replica
 Most simple approach while developing front end projects with HTML index file. 
 By default this option will search for "index.html" file and include all JavaScript files that are inside folder and will watch for file changes.
 ```
-build-replica ./
+build-replica
 ```
 Equivalent to:
 ```
