@@ -1,6 +1,6 @@
 {
 	"name": "build-replica",
-	"version": "0.1.26",
+	"version": "0.1.27",
 	"description": "Plug & play building tool for JavaScript.",
 	"author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
 	"main": "replica.js",
