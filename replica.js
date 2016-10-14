@@ -152,7 +152,10 @@ SourceFile.prototype =
 				this.nextChar();
 			}
 
-			return str.slice("\"require".length);
+			if(str === "use strict") { return null; }
+			if(str.indexOf("require ") !== 0) { return null;}
+
+			return str.slice("require ".length);
 		}
 
 		return null;
@@ -192,12 +195,24 @@ SourceFile.prototype =
 
 		this.cursor = 0;
 
+		let errorCount = 0;
+
 		for(;;)
 		{
-			var requireFile = this.nextRequire();
-			if(!requireFile) { break; }
+			let requireFile = this.nextRequire();
+			if(!requireFile) 
+			{ 
+				errorCount++; 
 
-			var requirePath = path.resolve(this.path + requireFile + ".js");
+				if(errorCount === 2) { 
+					break;
+				}
+				else {
+					continue;
+				}
+			}
+			
+			let requirePath = path.resolve(this.path + requireFile + ".js");
 			this.requires.push(requirePath);
 		}
 	},
@@ -370,23 +385,25 @@ function iterSource(sources, source, cb)
 	if(source.index === updateIndex) { return; }
 	source.index = updateIndex;
 
-	iterSourceIncludes(sources, source.requires, cb);
+	iterSourceIncludes(sources, source, cb);
 
 	cb(source);
 }
 
-function iterSourceIncludes(sources, includes, cb)
+function iterSourceIncludes(sources, source, cb)
 {
+	let includes = source.requires;
+
 	for(let n = 0; n < includes.length; n++)
 	{
 		let src = includes[n];
-		let source = sources[src];
-		if(!source) {
-			console.warn("No such file found: " + src);
+		let includeSource = sources[src];
+		if(!includeSource) {
+			console.warn("No such file found: " + src + "\n  Referenced in: " + (source.path + source.filename));
 			continue;
 		}
 
-		iterSource(sources, source, cb);
+		iterSource(sources, includeSource, cb);
 	}
 }
 
@@ -590,7 +607,7 @@ function addInput(src)
 	const inputSrc = path.resolve(src);
 
 	if(!fs.existsSync(inputSrc)) {
-		console.error("Invalid directory: " + path);
+		console.error("ERROR: Invalid input directory: " + inputSrc);
 		return;
 	}
 
@@ -654,7 +671,6 @@ function resolveOutputDir()
 			{
 				console.log("Creating directories recursively: " + packageFolderSrc);
 
-				console.log("create", currSrc)
 				fs.mkdirSync(currSrc);
 
 				for(n++; n < relativeBuffer.length; n++)
