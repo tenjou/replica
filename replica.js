@@ -623,6 +623,50 @@ function isSpace(c) {
 	return (c === " " || c === "\t" || c === "\r" || c === "\n" || c === ";");
 }
 
+function resolveOutputDir()
+{
+	packageSrc = path.resolve(packageSrc);
+
+	const slash = path.normalize("/");
+	const extIndex = packageSrc.lastIndexOf(".");
+	if(extIndex === -1) 
+	{
+		const lastChar = packageSrc[packageSrc.length - 1];
+		if(lastChar !== "/" && lastChar !== "\\") {
+			packageSrc += slash;
+		}
+		
+		packageSrc += "package.js";
+	}
+
+	const relativeSrc = path.relative("./", packageSrc);
+	const index = relativeSrc.lastIndexOf(slash);
+	if(index !== -1)
+	{
+		const packageFolderSrc = relativeSrc.slice(0, index);
+		const relativeBuffer = packageFolderSrc.split(slash);
+
+		let currSrc = "";
+		for(let n = 0; n < relativeBuffer.length; n++) 
+		{
+			currSrc += relativeBuffer[n] + slash;
+			if(!fs.existsSync(currSrc)) 
+			{
+				console.log("Creating directories recursively: " + packageFolderSrc);
+
+				console.log("create", currSrc)
+				fs.mkdirSync(currSrc);
+
+				for(n++; n < relativeBuffer.length; n++)
+				{
+					currSrc += relativeBuffer[n] + slash;
+					fs.mkdirSync(currSrc);
+				}
+			}
+		}
+	}	
+}
+
 console.log("");
 processArgs();
 
@@ -630,7 +674,7 @@ if(inputs.length === 0) {
 	process.exit(1);
 }
 
-packageSrc = path.resolve(packageSrc);
+resolveOutputDir();
 
 if(flags.concat) {
 	concatSources();
