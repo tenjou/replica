@@ -1,6 +1,7 @@
 # REPLICA
 
 [![npm version](https://badge.fury.io/js/build-replica.svg)](https://badge.fury.io/js/build-replica)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
 Replica is small and configureless build tool for most common actions you will find while developing front end JavaScript applications or libraries.
 
