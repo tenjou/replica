@@ -23,7 +23,7 @@ npm install -g build-replica
 
 ## Usage
 
-### 1) Plug & play
+#### 1. Plug & play
 Most simple approach while developing front end projects with HTML index file. 
 By default this option will search for "index.html" file and include all JavaScript files that are inside folder and will watch for file changes.
 ```
@@ -34,17 +34,17 @@ Equivalent to:
 build-replica --input ./ --index index.html --watch --timestamp
 ```
 
-### 2) Customized development build
+#### 2. Customized development build
 ```
 build-replica --input lib --input src --index index.html --watch --timestamp
 ```
 
-### 3) Production ready compilation
+#### 3. Production ready compilation
 ```
 build-replica --input lib --input src --index index.html --uglify --timestamp
 ```
 
-### 4) Compile library
+#### 4. Compile library
 ```
 build-replica --input lib --concat build/my_package.js --uglify
 ```
@@ -82,7 +82,7 @@ Will make b.js to be included before a.js.
 
 MIT License
 
-Copyright (c) 2016 
+Copyright (c) 2016 Arturs Šefers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
