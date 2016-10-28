@@ -1,5 +1,6 @@
 # REPLICA
-> Plug & play building tool for JavaScript.
+
+[![npm version](https://badge.fury.io/js/build-replica.svg)](https://badge.fury.io/js/build-replica)
 
 Replica is small and configureless build tool for most common actions you will find while developing front end JavaScript applications or libraries.
 
