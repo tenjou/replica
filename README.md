@@ -62,7 +62,7 @@ Will make b.js to be included before a.js.
 ## Options
 
 ```
-  --input <dir|file>                	Specify an input folder. Order they are defined in also will change order they are included.
+  --input <dir|file>            Specify an input folder. Order they are defined in also will change order they are included.
   --index <file>           		The path to output index file.
   --watch						Look after file changes in set input folders.
   --concat <file=./package.js>	Specify that files should be concatenated inside one file.
@@ -77,6 +77,7 @@ Will make b.js to be included before a.js.
 - Custom input packages
 - Download url dependencies inside cache
 - Documentation generation
+- Support ECMA6 import syntax
 
 ## License
 
