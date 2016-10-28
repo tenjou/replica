@@ -14,6 +14,15 @@ let watchingFiles = false;
 let updateIndex = 1;
 let packageSrc = "./package.js";
 
+function loadFile(input, src)
+{
+	const dirSrc = path.dirname(src);
+	const fileSrc = path.basename(src);
+
+	createSource(input, path.normalize(dirSrc + "/"), fileSrc);
+	watchDirectory(input, dirSrc);
+}
+
 function loadDirectory(input, src) 
 {
 	const dirSrc = path.normalize(src + "/");
@@ -63,13 +72,17 @@ function watchDirectoryFunc(input, src, eventType, filename)
 		{
 			if(fileExist) 
 			{
-				let stats = fs.statSync(fullSrc);
-				let isDirectory = stats.isDirectory();
+				const isDirectory = fs.statSync(fullSrc).isDirectory();
 
 				if(isDirectory) {
 					loadDirectory(input, fullSrc);
 				}
-				else {
+				else 
+				{
+					if(input.staticSources && !input.staticSources[fullSrc]) {
+						break;
+					}
+
 					createSource(input, src, filename);
 				}
 			}
@@ -105,8 +118,19 @@ function Input(src)
 {
 	this.src = src;
 	this.sources = {};
+	this.staticSources = null;
+	
+	const isDirectory = fs.lstatSync(src).isDirectory();
 
-	loadDirectory(this, src);
+	if(isDirectory) {
+		loadDirectory(this, src);
+	}
+	else 
+	{
+		this.staticSources = {};
+		this.staticSources[src] = true;
+		loadFile(this, src);
+	}
 }
 
 function SourceFile(path, filename)
@@ -228,6 +252,7 @@ function IndexFile(path, filename, content)
 	this.contentEnd = null;
 	this._content = null;
 	this.updating = false;
+	this.loaded = false;
 
 	this.path = path;
 	this.filename = filename;
@@ -245,6 +270,8 @@ IndexFile.prototype =
 
 	updateScripts: function()
 	{
+		if(!this.loaded) { return; }
+
 		let content = this.contentStart;
 
 		if(flags.concat) 
@@ -285,6 +312,8 @@ IndexFile.prototype =
 		const prefixStart = "<!-- REPLICA_START -->";
 		const prefixEnd = "<!-- REPLICA_END -->";
 
+		this.loaded = false;
+
 		const headEndIndex = content.indexOf("</head>");
 		if(headEndIndex === -1) {
 			return console.error("IndexFile: Could not find <head> ending.")
@@ -319,6 +348,8 @@ IndexFile.prototype =
 				this.contentEnd = content.slice(index);
 			}
 		}
+
+		this.loaded = true;
 	},
 
 	get content() {
@@ -339,6 +370,7 @@ function createSource(input, src, filename)
 	if(ext !== "js") { return; }
 
 	input.sources[fullSrc] = new SourceFile(src, filename);
+
 	actionsUpdateIndex = true;
 }
 
@@ -482,7 +514,7 @@ function updateTick()
 				}
 			}
 
-			console.log("Update file: ", key)
+			logYellow("update", "File: " + key);
 
 			source.update();
 		}
@@ -525,7 +557,7 @@ function defaultInit(src)
 
 	const fileExist = fs.existsSync(src + "/index.html");
 	if(fileExist) {
-		addIndex(args[0] + "/index.html");
+		addIndex(src + "/index.html");
 	}	
 }
 
@@ -607,21 +639,25 @@ function addInput(src)
 	const inputSrc = path.resolve(src);
 
 	if(!fs.existsSync(inputSrc)) {
-		console.error("ERROR: Invalid input directory: " + inputSrc);
-		return;
+		return logError("Input not found: " + inputSrc);
 	}
-
-	console.log("Input directory: " + inputSrc);
 
 	let input = new Input(inputSrc);
 	inputs.push(input);
+
+	if(input.staticSources) {
+		logGreen("input", "Directory: " + inputSrc);
+	}
+	else {
+		logGreen("input", "File: " + inputSrc);
+	}
 }
 
 function addIndex(src) 
 {
 	const fileExist = fs.existsSync(src);
 	if(!fileExist) {
-		return console.warn("No such index file found at: " + src);
+		return console.warn("\x1b[91m", "No such index file found at: " + src, "\x1b[0m");
 	}
 
 	let slash = path.normalize("/");
@@ -633,8 +669,38 @@ function addIndex(src)
 	let indexFile = new IndexFile(absoluteSrc.slice(0, index + 1), filename, content);
 	indexFiles[absoluteSrc] = indexFile;
 
-	console.log("Index file: " + absoluteSrc);
+	logGreen("output", "Index file: " + absoluteSrc);
 }
+
+function logGreen(type, text) {
+	console.log(createTimestamp(), "\x1b[92m" + type, "\x1b[0m" + text);	
+}
+
+function logYellow(type, text) {
+	console.log(createTimestamp(), "\x1b[33m" + type, "\x1b[0m" + text);	
+}
+
+function logError(text) {
+	console.log(createTimestamp(), "\x1b[91m" + "Error: " + text, "\x1b[0m");	
+}
+
+function createTimestamp() 
+{
+	const date = new Date();
+	const hour = date.getHours();
+	const minutes = date.getMinutes();
+	const seconds = date.getSeconds();
+	const milliseconds = date.getMilliseconds();
+
+	return "[" +
+		((hour < 10) ? "0" + hour: hour) +
+		":" +
+		((minutes < 10) ? "0" + minutes: minutes) +
+		":" +
+		((seconds < 10) ? "0" + seconds: seconds) +
+		"]";
+}
+
 
 function isSpace(c) {
 	return (c === " " || c === "\t" || c === "\r" || c === "\n" || c === ";");

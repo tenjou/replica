@@ -1,6 +1,6 @@
 {
 	"name": "build-replica",
-	"version": "0.1.28",
+	"version": "0.1.29",
 	"description": "Plug & play building tool for JavaScript.",
 	"author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
 	"main": "replica.js",
@@ -11,6 +11,11 @@
 		"type": "git",
 		"url": "https://github.com/tenjou/replica"
 	},
+	"scripts": {
+		"build": "npm run build:default & npm run build:uglify",
+		"build:default": "build-replica --input src --concat build/meta2d.js",
+		"build:uglify": "build-replica --input src --concat build/meta2d.min.js --uglify"
+	},	
 	"bin": {
 		"build-replica": "./bin/replica"
 	},
