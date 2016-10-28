@@ -1,7 +1,7 @@
 const fs = require("fs");
 const path = require("path");
 const FSEvent = process.binding("fs_event_wrap").FSEvent;
-const uglifyJS = require("uglify-js2");
+const uglifyJS = require("uglify-js");
 
 let watching = {};
 let flags = {};
@@ -441,7 +441,7 @@ function iterSourceIncludes(sources, source, cb)
 
 function concatSources()
 {
-	console.log("Compiling: " + packageSrc);
+	logMagenta("compiling", packageSrc);
 
 	let content = "";
 
@@ -458,12 +458,12 @@ function concatSources()
 
 	fs.writeFileSync(packageSrc, content);
 
-	console.log("Finished");
+	logMagenta("finished", "");
 }
 
 function uglifySources(content)
 {
-	console.log("Uglifying package");
+	logMagenta("uglifying", "");
 
 	let result = uglifyJS.minify(content, { 
 		fromString: true,
@@ -678,6 +678,10 @@ function logGreen(type, text) {
 
 function logYellow(type, text) {
 	console.log(createTimestamp(), "\x1b[33m" + type, "\x1b[0m" + text);	
+}
+
+function logMagenta(type, text) {
+	console.log(createTimestamp(), "\x1b[35m" + type, "\x1b[0m" + text);	
 }
 
 function logError(text) {

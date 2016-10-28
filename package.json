@@ -1,11 +1,11 @@
 {
 	"name": "build-replica",
-	"version": "0.1.30",
+	"version": "0.1.31",
 	"description": "Plug & play building tool for JavaScript.",
 	"author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
 	"main": "replica.js",
 	"dependencies": { 
-		"uglify-js2" : "*"
+		"uglify-js2" : "github:mishoo/UglifyJS2#harmony"
 	},
 	"repository": {
 		"type": "git",
