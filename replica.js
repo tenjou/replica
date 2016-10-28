@@ -465,15 +465,24 @@ function uglifySources(content)
 {
 	logMagenta("uglifying", "");
 
-	let result = uglifyJS.minify(content, { 
-		fromString: true,
-		compress: { 
-			dead_code: true,
-		},
-		mangle: true 
-	});
+	let result = null;
+
+	try 
+	{
+		result = uglifyJS.minify(content, { 
+			fromString: true,
+			compress: { 
+				dead_code: true,
+			},
+			mangle: true 
+		});
+	}
+	catch(error)
+	{
+		console.log(error);
+	}
 	
-	return result.code;
+	return result ? result.code : 0;
 }
 
 function updateTick()
