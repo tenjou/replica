@@ -304,7 +304,7 @@ IndexFile.prototype =
 		content += this.contentEnd;
 		this.updating = true;
 
-		fs.writeFileSync(this.path + this.filename, content);
+		fs.writeFile(this.path + this.filename, content);
 	},
 
 	set content(content)
