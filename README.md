@@ -75,7 +75,6 @@ Will make b.js to be included before a.js.
 
 ## TODO
 
-- Help inside cmd
 - Add optional package syntax
 - Custom input packages
 - Download url dependencies inside cache
