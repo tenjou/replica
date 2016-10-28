@@ -63,12 +63,14 @@ Will make b.js to be included before a.js.
 ## Options
 
 ```
-  --input <dir|file>            Specify an input folder. Order they are defined in also will change order they are included.
-  --index <file>           		The path to output index file.
-  --watch						Look after file changes in set input folders.
-  --concat <file=./package.js>	Specify that files should be concatenated inside one file.
-  --uglify						Specify that concatenated file should be minified. Setting this will force --concat flag to true.
-  --timestamp					Add timestamp to scripts inside index file.
+  -i, --input <dir|file>        	Specify an input folder. Order they are defined in also will change order they are included.
+  -I, --index <file>           		The path to output index file.
+  -w, --watch						Look after file changes in set input folders.
+  -c, --concat <file=./package.js>	Specify that files should be concatenated inside one file.
+  -u, --uglify						Specify that concatenated file should be minified. Setting this will force --concat flag to true.
+  -t, --timestamp					Add timestamp to scripts inside index file.
+  -h, --help 						Print help.
+  -v, --version						Current version number.
 ```
 
 ## TODO

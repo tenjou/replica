@@ -246,29 +246,29 @@ SourceFile.prototype =
 	}
 }
 
-function IndexFile(path, filename, content)
+class IndexFile
 {
-	this.contentStart = null;
-	this.contentEnd = null;
-	this._content = null;
-	this.updating = false;
-	this.loaded = false;
+	constructor(path, filename, content) 
+	{
+		this.contentStart = null;
+		this.contentEnd = null;
+		this._content = null;
+		this.updating = false;
+		this.loaded = false;
 
-	this.path = path;
-	this.filename = filename;
-	this.timestamp = "";
+		this.path = path;
+		this.filename = filename;
+		this.timestamp = "";
 
-	this.update();
-}
+		this.update();
+	}
 
-IndexFile.prototype = 
-{
-	update: function() {
+	update() {
 		this.content = fs.readFileSync(this.path + this.filename, "utf8");
 		actionsUpdateIndex = true;
-	},
+	}
 
-	updateScripts: function()
+	updateScripts()
 	{
 		if(!this.loaded) { return; }
 
@@ -305,7 +305,7 @@ IndexFile.prototype =
 		this.updating = true;
 
 		fs.writeFile(this.path + this.filename, content);
-	},
+	}
 
 	set content(content)
 	{
@@ -350,12 +350,12 @@ IndexFile.prototype =
 		}
 
 		this.loaded = true;
-	},
+	}
 
 	get content() {
 		return this._content;
-	}
-};
+	}	
+}
 
 function createSource(input, src, filename)
 {
@@ -575,7 +575,7 @@ function processArgs()
 	const args = process.argv.slice(2);
 	const numArgs = args.length;
 
-	if(numArgs === 1) {
+	if(numArgs === 1 && args[0][0] !== "-") {
 		defaultInit(args[0]);
 	}
 	else if(numArgs === 0) {
@@ -591,12 +591,17 @@ function processArgs()
 				let flagName = flag.slice(2);
 				flags[flagName] = true;
 			}
+			else if(flag.indexOf("-") !== -1) 
+			{
+				let flagName = flag.slice(1);
+				flags[flagName] = true;
+			}
 		}
 
 		for(let n = 0; n < numArgs; n++)
 		{
 			let flag = args[n];
-			if(flag.indexOf("--") !== -1) 
+			if(flag.indexOf("-") !== -1) 
 			{
 				let flagArgs = [];
 				
@@ -604,7 +609,7 @@ function processArgs()
 				{
 					let arg = args[n];
 
-					if(arg.indexOf("--") === -1) {
+					if(arg.indexOf("-") === -1) {
 						flagArgs.push(arg);
 					}
 					else {
@@ -623,22 +628,36 @@ function handleArg(flag, args)
 {
 	switch(flag)
 	{
+		case "-i":
 		case "--input":
 			addInput(args[0]);
 			break;
 
+		case "-I":
 		case "--index":
 			addIndex(args[0]);
 			break;
 
+		case "-c":
 		case "--concat":
 			if(args[0]) {
 				packageSrc = args[0];
 			}
 			break;
 
+		case "-u":
 		case "--uglify":
 			flags.concat = true;
+			break;
+
+		case "-h":
+		case "--help":
+			printHelp();
+			break;
+
+		case "-v":
+		case "--version":
+			logYellow("version", require("./package.json").version);
 			break;
 	}
 }
@@ -714,6 +733,19 @@ function createTimestamp()
 		"]";
 }
 
+function printHelp() 
+{
+	console.log("-i, --input <dir|file>             Specify an input folder. Order they are defined in also will change");
+	console.log("                                     order they are included.");
+	console.log("-I, --index <file>                 The path to output index file.");
+  	console.log("-w, --watch                        Look after file changes in set input folders.");
+	console.log("-c, --concat <file=./package.js>   Specify that files should be concatenated inside one file.");
+	console.log("-u, --uglify                       Specify that concatenated file should be minified.");
+	console.log("                                     Setting this will force --concat flag to true.");
+	console.log("-t, --timestamp                    Add timestamp to scripts inside index file.");
+	console.log("-h, --help                         Print help.");
+	console.log("-v, --version                      Current version number.");
+}
 
 function isSpace(c) {
 	return (c === " " || c === "\t" || c === "\r" || c === "\n" || c === ";");
@@ -771,11 +803,11 @@ if(inputs.length === 0) {
 
 resolveOutputDir();
 
-if(flags.concat) {
+if(flags.concat || flags.c) {
 	concatSources();
 }
 
-if(flags.watch) {
+if(flags.watch || flags.w) {
 	startWatching();
 }
 else {
