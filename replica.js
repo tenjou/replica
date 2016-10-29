@@ -30,8 +30,8 @@ function loadDirectory(input, src)
 
 	for(let n = 0; n < dirContent.length; n++) 
 	{
-		let fileSrc = dirContent[n];
-		let stats = fs.statSync(dirSrc + fileSrc);
+		const fileSrc = dirContent[n];
+		const stats = fs.statSync(dirSrc + fileSrc);
 
 		if(stats.isDirectory()) {
 			loadDirectory(input, dirSrc + fileSrc);
@@ -46,7 +46,7 @@ function loadDirectory(input, src)
 
 function watchDirectory(input, src) 
 {
-	if(!flags.watch) { return; }
+	if(!flags.watch && !flags.w) { return; }
 	if(watching[src]) { return; }
 
 	let watchSrc = path.normalize(src + "/");
@@ -65,7 +65,7 @@ function watchDirectoryFunc(input, src, eventType, filename)
 	if(fullSrc === packageSrc) { return; } 
 
 	const fileExist = fs.existsSync(fullSrc);
-
+	
 	switch(eventType) 
 	{
 		case "rename":
@@ -674,10 +674,10 @@ function addInput(src)
 	inputs.push(input);
 
 	if(input.staticSources) {
-		logGreen("input", "Directory: " + inputSrc);
+		logGreen("input", "File: " + inputSrc);
 	}
 	else {
-		logGreen("input", "File: " + inputSrc);
+		logGreen("input", "Directory: " + inputSrc);
 	}
 }
 
