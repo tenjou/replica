@@ -2,6 +2,8 @@ const fs = require("fs");
 const path = require("path");
 const FSEvent = process.binding("fs_event_wrap").FSEvent;
 const uglifyJS = require("uglify-js");
+const lexer = require("./lexer.js");
+const compiler = require("./compiler.js");
 
 let watching = {};
 let flags = {};
@@ -554,20 +556,63 @@ function startWatching()
 
 	setInterval(function() {
 		updateTick();
-	}, 100);	
+	}, 100);
+}
+
+function deleteFolder(folderPath) 
+{
+	if(!fs.existsSync(folderPath)) {
+		return;
+	}
+
+	fs.readdirSync(folderPath).forEach(
+		(file, index) => {
+			let currPath = folderPath + "/" + file;
+			if(fs.lstatSync(currPath).isDirectory()) { 
+				deleteFolder(currPath);
+			} 
+			else {
+				fs.unlinkSync(currPath);
+			}
+		});
+
+	fs.rmdirSync(path);
 }
 
 function defaultInit(src)
 {
-	flags.watch = true;
-	flags.timestamp = true;
+	// flags.watch = true;
+	// flags.timestamp = true;
 
-	addInput(src);
+	const rootPath = path.dirname(path.resolve(src)) + path.normalize("/");
+	const filename = path.basename(src);
 
-	const fileExist = fs.existsSync(src + "/index.html");
-	if(fileExist) {
-		addIndex(src + "/index.html");
-	}	
+	deleteFolder("./build");
+	fs.mkdirSync("./build");
+
+	const sourceFile = lexer.parse(rootPath, filename, 
+		(rootPath, path, func) => {
+			console.log("[rootPath]", rootPath);
+			console.log("[path]", path);
+			func(fs.readFileSync(rootPath + path));
+		},
+		(sourceFile) => {
+			compiler.compile(sourceFile, { },
+				(file, content) => {
+					console.log("---[FILE]:", file.id);
+					console.log(content);
+					
+					fs.writeFileSync("build/" + file.id + ".js", content);
+				});
+		});
+	
+
+	// addInput(src);
+
+	// const fileExist = fs.existsSync(src + "/index.html");
+	// if(fileExist) {
+	// 	addIndex(src + "/index.html");
+	// }	
 }
 
 function processArgs() 
@@ -579,7 +624,7 @@ function processArgs()
 		defaultInit(args[0]);
 	}
 	else if(numArgs === 0) {
-		defaultInit("./");
+		defaultInit("./main.js");
 	}
 	else
 	{
