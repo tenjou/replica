@@ -1,5 +1,5 @@
 
-export default main()
+export default function main()
 {
 	console.log("Hello World!");
 }
