@@ -82,6 +82,7 @@ class IndexFile
 			content += `<script src="${src}${timestamp}"></script>\n`;
 
 			if(cli.flags.server) {
+				const src = path.relative(this.rootPath, buildSrc) + path.normalize("/");
 				content += `<script>window.REPLICA_SERVER_PORT = ${server.getHttpPort()};</script>\n`;
 				content += `<script src="${src}replica.js"></script>\n`;
 			}			
@@ -488,11 +489,16 @@ function run(file)
 
 function start()
 {
+	if(cli.flags.uglify) {
+		cli.flags.concat = {};
+	}
+
 	if(cli.flags.watch) 
 	{
 		if(cli.flags.server) {
-			utils.logMagenta("ServerOpened", `http://127.0.0.1:${server.getHttpPort()}`);
-			childProcess.spawn("explorer", [ `http://127.0.0.1:${server.getHttpPort()}` ]);
+			const serverAddress = `http://127.0.0.1:${server.getHttpPort()}`;
+			utils.logMagenta("ServerOpened", serverAddress);
+			childProcess.spawn("explorer", [ serverAddress ]);
 		}
 
 		setInterval(() => {
