@@ -1,76 +1,146 @@
-const acorn = require("../lib/acorn.js");
+const fs = require("fs");
+const path = require("path");
+const acorn = require("./acorn.js");
 const AST = require("./ast.js");
+const compiler = require("./compiler.js");
+const utils = require("./utils");
+
+const ctx = {
+	sourceFiles: {},
+	currSourceId: 0,
+	currSourceFile: null
+};
+
+const nodeModulesPath = process.cwd() + "/node_modules/";
 
 const acornCfg = {
 	ecmaVersion: 6,
 	sourceType: "module"
 };
 
-const context = {
-	sourceFiles: {},
-	currSourceId: 0,
-	currSourceFile: null,
-	fetchFunc: null,
-	doneFunc: null
-};
+const library = {};
 
-function parse(rootPath, path, fetchFunc, doneFunc) 
+class SourceFile
 {
-	context.fetchFunc = fetchFunc;
-	context.doneFunc = doneFunc;
+	constructor(id, filePath) 
+	{
+		const slash = path.normalize("/");
 
-	getSourceFile(rootPath, path);
-}
-
-function getSourceFile(rootPath, path)
-{
-	const ext = path.split(".").pop();
-	if(ext !== "js") {
-		path += ".js";
+		this.id = id;
+		this.rootPath = path.dirname(filePath) + slash;
+		this.filename = path.basename(filePath);
+		this.compileIndex = 0;
+		this.timestamp = Date.now();
+		this.blockNode = null;
+		this.imports = [];
+		this.importsMap = {};
+		this.exports = [];
+		this.exportDefault = false;
 	}
 
-	const fullPath = rootPath + path;
-	console.log("fullpath:", fullPath)
-
-	let sourceFile = context.sourceFiles[fullPath];
-	if(!sourceFile) 
+	clear()
 	{
-		const sourceFileId = "_" + (context.currSourceId++);
-		sourceFile = new SourceFile(sourceFileId, rootPath);
-		context.sourceFiles[fullPath] = sourceFile;
+		this.exportDefault = false;
+		this.importsMap = {};
+		this.imports.length = 0;
+		this.exports.length = 0;
+		this.timestamp = Date.now();		
+	}
 
-		context.fetchFunc(rootPath, path, content => {
-			sourceFile.content = content;
-			context.doneFunc(sourceFile);
-		});
+	update() 
+	{
+		const filePath = this.rootPath + this.filename;
+
+		if(!fs.existsSync(filePath)) {
+			this.blockNode = null;
+			console.error("(SourceFile.update) No such file exists:", filePath);
+			return;
+		}
+
+		const content = fs.readFileSync(filePath);
+
+		let node = null;
+		try {
+			node = acorn.parse(content, acornCfg);
+		}
+		catch(error) {
+			console.error(`ParseError: <${this.filename}>`, error);
+		}
+
+		const prevSourceFile = ctx.currSourceFile;
+		ctx.currSourceFile = this;
+		
+		this.clear();
+		this.blockNode = parse_BlockStatement(node);
+
+		ctx.currSourceFile = prevSourceFile;
+	}
+}
+
+function addLibrary(name, filePath) {
+	library[name] = filePath;
+}
+
+function getSourceFile(filePath)
+{
+	let sourceFile = ctx.sourceFiles[filePath];
+	if(!sourceFile)
+	{
+		sourceFile = new SourceFile(ctx.currSourceId++, filePath);
+		sourceFile.update();
+		ctx.sourceFiles[filePath] = sourceFile;
 	}
 
 	return sourceFile;
 }
 
-class SourceFile
+function parse(filePath) 
 {
-	constructor(id, rootPath) 
-	{
-		console.log("FILE:", id, rootPath);
+	const sourceFile = getSourceFile(filePath);
+	return sourceFile;
+}
 
-		this.id = id;
-		this.rootPath = rootPath;
-		this.compileIndex = 0;
-		this.blockNode = null;
-		this.imports = [];
-		this.exports = [];
+function parseAll(filePath)
+{
+	const sourceFile = this.parse(filePath);
+	return sourceFile;
+}
+
+function compile(sourceFile, needModule) 
+{
+	const result = compiler.compile(sourceFile, {
+		type: "content",
+		transpiling: true,
+		needModule: needModule
+	});
+	return result;
+}
+
+function compileAll(sourceFile) 
+{
+	const result = compiler.compile(sourceFile, {
+		type: "content",
+		concat: true,
+		transpiling: true,
+		needModule: true
+	});
+
+	return result;
+}
+
+function getImports(sourceFile) 
+{
+	if(!sourceFile) {
+		console.error("(getImports) Invalid sourceFile passed");
+		return null;
 	}
 
-	set content(content)
-	{
-		const node = acorn.parse(content, acornCfg);
+	const imports = compiler.compile(sourceFile, {
+		type: "imports",
+		transpiling: true
+	});
 
-		context.currSourceFile = this;
-		this.imports.length = 0;
-		this.exports.length = 0;
-		this.blockNode = parse_BlockStatement(node);
-	}
+	return imports;
 }
 
 function Scope() {
@@ -81,25 +151,8 @@ function parse_Identifier(node) {
 	return new AST.Identifier(node.name);
 }
 
-function parse_Literal(node) 
-{
-	if(typeof node.value === "string") {
-		return new AST.String(node.value);
-	}
-	else 
-	{
-		if(node.raw === "false") {
-			return new AST.Bool(0);
-		}
-		else if(node.raw === "true") {
-			return new AST.Bool(1);
-		}
-		else if(node.raw === "null") {
-			return new AST.Null;
-		}
-	}
-
-	return new AST.Number(node.value);
+function dontParse(node) {
+	return node;
 }
 
 function parse_ExpressionStatement(node) {
@@ -181,7 +234,7 @@ function parse_ObjectMember(node)
 	const key = doLookup(node.key);
 	const value = doLookup(node.value);
 
-	const objMemberExpr = new AST.ObjectMember(key, value);
+	const objMemberExpr = new AST.ObjectMember(key, value, node.kind);
 	return objMemberExpr;
 }
 
@@ -246,9 +299,27 @@ function parse_FunctionExpression(node)
 	return funcExpr;
 }
 
+function parse_LogicalExpression(node)
+{
+	const left = doLookup(node.left);
+	const right = doLookup(node.right);
+
+	const logicalExpr = new AST.LogicalExpression(left, right, node.operator);
+	return logicalExpr;
+}
+
+function parse_ArrowFunctionExpression(node)
+{
+	const body = doLookup(node.body);
+	const params = parse_Args(node.params);
+
+	const arrowFuncExpr = new AST.ArrowFunctionExpression(params, node.expression, node.generator, body);
+	return arrowFuncExpr;
+}
+
 function parse_ThisExpression(node)
 {
-	const thisExpr = new AST.This();
+	const thisExpr = new AST.ThisExpression();
 	return thisExpr;
 }
 
@@ -334,6 +405,8 @@ function parse_MethodDefinition(node)
 
 function parse_BlockStatement(node) 
 {
+	if(!node) { return null; }
+
 	const scope = new Scope();
 
 	parse_Body(node.body, scope);
@@ -438,7 +511,7 @@ function parse_ForInStatement(node)
 function parse_WhileStatement(node)
 {
 	const test = doLookup(node.test);
-	const body = parse_BlockStatement(node.body);
+	const body = doLookup(node.body);
 
 	const whileStatement = new AST.While(test, body);
 	return whileStatement;
@@ -477,6 +550,14 @@ function parse_TryStatement(node)
 	return tryStatement;
 }
 
+function parse_ThrowStatement(node)
+{
+	const arg = doLookup(node.argument);
+
+	const throwStatement = new AST.Throw(arg);
+	return throwStatement;
+}
+
 function parse_CatchClause(node)
 {
 	const param = doLookup(node.param);
@@ -493,9 +574,46 @@ function parse_ImportDeclaration(node)
 	const source = doLookup(node.source);
 	const imported = parse_ImportSpecifiers(node.specifiers, specifiersMap);
 
-	const sourceFile = getSourceFile(context.currSourceFile.rootPath, source.value);
+	const importsMap = ctx.currSourceFile.importsMap;
+	for(const key in specifiersMap) {
+		importsMap[key] = true;
+	}
+
+	let fullPath;
+	if(source.value[0] !== ".") 
+	{
+		const libraryPath = nodeModulesPath + source.value;
+		if(!fs.existsSync(libraryPath)) {
+			utils.logError("LibraryNotFound", source.value);
+			return;
+		}
+
+		const packagePath = libraryPath + "/package.json";
+		if(!fs.existsSync(packagePath)) {
+			utils.logError("PackageNotFound", source.value);
+			return;
+		}
+
+		const packageContent = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+		const mainEntry = packageContent.main;
+		if(!mainEntry) {
+			utils.logError("PackageEntryNotFound", source.value);
+			return;
+		}
+
+		fullPath = path.resolve(libraryPath, mainEntry);
+	}
+	else
+	{
+		fullPath = path.resolve(ctx.currSourceFile.rootPath, source.value);
+		if(path.extname(fullPath) !== ".js") {
+			fullPath += ".js";
+		}
+	}
+
+	const sourceFile = getSourceFile(fullPath);
 	const importDecl = new AST.Import(source, specifiersMap, imported, sourceFile);
-	context.currSourceFile.imports.push(sourceFile);
+	ctx.currSourceFile.imports.push(sourceFile);
 
 	return importDecl;
 }
@@ -524,11 +642,99 @@ function parse_ImportSpecifiers(specifiers, map)
 
 function parse_ExportNamedDeclaration(node)
 {
+	const specifiers = node.specifiers;
+
+	if(node.source) {
+		parse_ImportDeclaration(node);
+	}
+
+	if(specifiers.length > 0) 
+	{
+		for(let n = 0; n < specifiers.length; n++) {
+			const exportSpecifier = parse_ExportSpecifier(specifiers[n]);
+			ctx.currSourceFile.exports.push(exportSpecifier);
+		}
+
+		return null;
+	}
+
 	const decl = doLookup(node.declaration);
 
-	context.currSourceFile.exports.push(decl);
+	ctx.currSourceFile.exports.push(decl);
 
 	return decl;
+}
+
+function parse_ExportSpecifier(node)
+{
+	const local = doLookup(node.local);
+	const exported = doLookup(node.exported);
+
+	const exportSpecifier = new AST.ExportSpecifier(local, exported);
+	return exportSpecifier;
+}
+
+function parse_ExportDefaultDeclaration(node)
+{
+	const decl = doLookup(node.declaration);
+
+	const exportDefaultDecl = new AST.ExportDefaultDeclaration(decl);
+	return exportDefaultDecl;
+}
+
+function parse_Super(node)
+{
+	const superNode = new AST.Super();
+	return superNode;
+}
+
+function parse_TemplateLiteral(node)
+{
+	const expressions = parse_TemplateExpressions(node.expressions);
+	const quasis = parse_TemplateQuasis(node.quasis);
+
+	const templateLiteral = new AST.TemplateLiteral(expressions, quasis);
+	return templateLiteral;
+}
+
+function parse_TemplateExpressions(expressions)
+{
+	const num = expressions.length;
+	const result = new Array(num);
+
+	for(let n = 0; n < num; n++)
+	{
+		const expr = doLookup(expressions[n]);
+		result[n] = expr;
+	}
+
+	return result;
+}
+
+function parse_TemplateQuasis(quasis)
+{
+	const num = quasis.length;
+	const result = new Array(num);
+
+	for(let n = 0; n < num; n++)
+	{
+		const q = parse_TemplateElement(quasis[n]);
+		result[n] = q;
+	}
+
+	return result;
+}
+
+function parse_TemplateElement(node)
+{
+	const templateElement = new AST.String(node.value.cooked, node.value.raw);
+	return templateElement;
+}
+
+function parse_EmptyStatement(node) 
+{
+	const emptyStatement = new AST.EmptyStatement();
+	return emptyStatement;
 }
 
 function doLookup(node) {
@@ -537,7 +743,10 @@ function doLookup(node) {
 
 const lookup = {
 	Identifier: parse_Identifier,
-	Literal: parse_Literal,
+	String: dontParse,
+	Bool: dontParse,
+	Number: dontParse,
+	Null: dontParse,
 	ExpressionStatement: parse_ExpressionStatement,
 	CallExpression: parse_CallExpression,
 	MemberExpression: parse_MemberExpression,
@@ -552,6 +761,8 @@ const lookup = {
 	UnaryExpression: parse_UnaryExpression,
 	SequenceExpression: parse_SequenceExpression,
 	FunctionExpression: parse_FunctionExpression,
+	LogicalExpression: parse_LogicalExpression,
+	ArrowFunctionExpression: parse_ArrowFunctionExpression,
 	ThisExpression: parse_ThisExpression,
 	VariableDeclaration: parse_VariableDeclaration,
 	VariableDeclarator: parse_VariableDeclarator,
@@ -570,10 +781,15 @@ const lookup = {
 	ContinueStatement: parse_ContinueStatement,
 	LabeledStatement: parse_LabeledStatement,
 	TryStatement: parse_TryStatement,
+	ThrowStatement: parse_ThrowStatement,
 	ImportDeclaration: parse_ImportDeclaration,
-	ExportNamedDeclaration: parse_ExportNamedDeclaration
+	ExportNamedDeclaration: parse_ExportNamedDeclaration,
+	Super: parse_Super,
+	TemplateLiteral: parse_TemplateLiteral,
+	EmptyStatement: parse_EmptyStatement,
+	ExportDefaultDeclaration: parse_ExportDefaultDeclaration
 };
 
 module.exports = {
-	SourceFile, parse
+	parse, parseAll, compile, compileAll, getImports, SourceFile, addLibrary
 };

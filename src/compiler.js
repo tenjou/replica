@@ -6,45 +6,105 @@ let numTabs = 0;
 const context = {
 	currSourceFile: null,
 	compileIndex: 0,
-	flags: {
-		transpiling: true
-	},
-	contentFunc: null
+	flags: null
 };
 
-function compile(file, flags, contentFunc)
+const requirements = {
+	inherits: false
+};
+
+const clsCtx = {
+	inside: false,
+	insideConstr: false,
+	id: null,
+	superCls: null
+};
+
+function compile(file, flags)
 {
-	context.contentFunc = contentFunc;
-	context.compileIndex++;
-
-	let fileResult = compileFile(file);
-
-	if(context.flags.transpiling)
+	if(!flags) 
 	{
-		let result = "window.module = { exports: {} };\n";
-		result += "window.exports = window.module.exports;\n\n";
-		result += fileResult;
-
-		context.contentFunc(file, result);
-		return;
+		flags = {
+			type: "content"
+		}	
 	}
 
-	context.contentFunc(file, fileResult);
+	context.flags = flags;
+	context.compileIndex++;
+
+	let requirementResult = "";
+
+	switch(flags.type)
+	{
+		case "imports":
+			return compileImports(file);
+
+		case "content":
+		{
+			const fileResult = compileContent(file);
+
+			// if(requirements.inherits) {
+				const requirementResult = `
+\nfunction _inherits(a, b)
+{
+	const protoA = a.prototype;
+	const proto = Object.create(b.prototype);
+
+	for(const key in protoA) 
+	{
+		const param = Object.getOwnPropertyDescriptor(protoA, key);
+		if(param.get || param.set) { 
+			Object.defineProperty(proto, key, param);
+		}
+		else {
+			proto[key] = protoA[key];
+		}
+	}
+
+	a.prototype = proto;
+	a.prototype.constructor = a;
+}\n`;
+				// const requirementResult = "function _inherits(a,b){var c=a.prototype,d=Object.create(b.prototype);d.name=b.name;a.prototype=d,a.prototype.constructor=b;for(var e in c){var f=Object.getOwnPropertyDescriptor(c,e);f.get||f.set?Object.defineProperty(d,e,f):d[e]=c[e]}}\n\n";
+			// }
+
+			if(flags.needModule && context.flags.transpiling)
+			// if(context.flags.transpiling)
+			{
+				let result = `"use strict";\n\n`;
+				result += "window.module = { exports: {} };\n";
+				result += "window.exports = window.module.exports;\n\n";
+				result += requirementResult;
+				result += fileResult;
+				return result;
+			}
+
+			let result = fileResult;
+			return result;
+		}
+	}
 }
 
-function compileFile(file)
+function compileContent(file) 
 {
 	let result = "";
 
 	file.compileIndex = context.compileIndex;
 
-	let imports = file.imports;
-	for(let n = 0; n < imports.length; n++) {
-		let fileImport = imports[n];
-		if(fileImport.compileIndex >= context.compileIndex) { continue; }
+	if(context.flags.concat) 
+	{
+		let imports = file.imports;
+		for(let n = 0; n < imports.length; n++) 
+		{
+			let fileImport = imports[n];
+			if(fileImport.compileIndex >= context.compileIndex) { 
+				continue; 
+			}
 
-		if(contenxt.flags.concat) {
-			result += compileFile(fileImport) + "\n\n";
+			if(!fileImport.blockNode) {
+				continue;
+			}
+
+			result += compileContent(fileImport) + "\n\n";
 		}
 	}
 
@@ -54,7 +114,7 @@ function compileFile(file)
 	{
 		incTabs();
 
-		result += "(function() ";
+		result += `"use strict";\n\n(function() `;
 		result += compile_Block(file.blockNode, compileSourceExports);
 		result += ")();"
 
@@ -67,24 +127,68 @@ function compileFile(file)
 	return result;
 }
 
+function compileImports(file) 
+{
+	context.compileIndex++;
+
+	let imports = [];
+	gatherImports(file, imports);
+
+	return imports;
+}
+
+function gatherImports(file, buffer)
+{
+	const imports = file.imports;
+	if(imports.length === 0) { return; }
+
+	for(let n = 0; n < imports.length; n++) 
+	{
+		let importedFile = imports[n];
+
+		if(importedFile.compileIndex === context.compileIndex) { continue; }
+		importedFile.compileIndex = context.compileIndex;
+
+		gatherImports(importedFile, buffer);
+
+		buffer.push(importedFile);
+	}
+}
+
+// TODO: Handle AST.New differently.
 function compileSourceExports()
 {
 	const sourceExports = context.currSourceFile.exports;
 	if(sourceExports.length === 0) { return ""; }
 
-	let result = `exports.${context.currSourceFile.id} = { `;
+	let result = `exports[${context.currSourceFile.id}] = `;
 
-	let node = sourceExports[0];
-	result += getNameFromNode(node);
-
-	for(let n = 1; n < sourceExports.length; n++) 
+	if(context.currSourceFile.exportDefault) 
 	{
-		let node = sourceExports[n];
-		result += ", " + getNameFromNode(node);
+		const node = sourceExports[0];
+		if(node instanceof AST.New) {
+			result += doCompileLookup(node) + ";";
+		}
+		else {
+			result += getNameFromNode(sourceExports[0]) + ";";
+		}
 	}
+	else
+	{
+		result += "{ ";
 
-	result += " };";
+		let node = sourceExports[0];
+		result += getNameFromNode(node);
 
+		for(let n = 1; n < sourceExports.length; n++) 
+		{
+			let node = sourceExports[n];
+			result += ", " + getNameFromNode(node);
+		}
+
+		result += " };";
+	}
+	
 	return result;
 }
 
@@ -108,6 +212,16 @@ function getNameFromNode(node)
 
 		return result;
 	}
+	else if(node instanceof AST.ExportSpecifier) {
+		const result = compile_ExportSpecifier(node);
+		return result;
+	}
+	else if(node instanceof AST.Identifier) {
+		return node.value;
+	}
+	else if(node instanceof AST.Name) {
+		return compile_Name(node);
+	}
 
 	return null;
 }
@@ -125,13 +239,17 @@ function compile_Bool(node) {
 }
 
 function compile_String(node) {
-	return `"${node.value}"`;
+	return node.raw;
 }
 
 function compile_New(node) 
 {
-	let result = "new " + 
-		doCompileLookup(node.callee) + 
+	let callee = doCompileLookup(node.callee);
+	if(node.callee.type === "Conditional") {
+		callee = "(" + callee + ")";
+	}
+
+	const result = "new " + callee + 
 		"(" + compile_Args(node.args) + ")";
 
 	return result;
@@ -150,7 +268,9 @@ function compile_Name(node)
 	{
 		if(parentNode.type !== "Identifier" && 
 		   parentNode.type !== "Call" &&
-		   parentNode.type !== "This") 
+		   parentNode.type !== "ThisExpression" &&
+		   parentNode.type !== "Name" &&
+		   parentNode.type !== "Super") 
 		{
 			result += "(" + doCompileLookup(parentNode) + ")";
 		}
@@ -171,21 +291,27 @@ function compile_Name(node)
 
 function compile_VariableDeclaration(node)
 {
-	let result = "";
-
 	const decls = node.decls;
-	for(let n = 0; n < decls.length; n++) 
-	{
-		let declNode = decls[n];
-		let declName = doCompileLookup(declNode.value);
-		result += node.kind + " " + declName;
 
-		if(declNode.expr) {
-			result += " = " + doCompileLookup(declNode.expr);
-		}		
+	let result = node.kind + " " + compile_VariableNode(decls[0]);
+	
+	for(let n = 1; n < decls.length; n++) {
+		result += ", " + compile_VariableNode(decls[n]);
 	}
 
 	return result;
+}
+
+function compile_VariableNode(node)
+{
+	const declName = doCompileLookup(node.value);
+
+	if(node.expr) {
+		let result = declName + " = " + doCompileLookup(node.expr);
+		return result;
+	}
+
+	return declName;		
 }
 
 function compile_Array(node)
@@ -208,10 +334,10 @@ function compile_Array(node)
 function compile_Object(node)
 {
 	const props = node.value;
-	if(props.length === 0) { return tabs + "{}"; }
+	if(props.length === 0) { return "{}"; }
 
 	let propsNode = props[0];
-	let result = tabs + "{\n";
+	let result = "{\n";
 
 	incTabs();
 
@@ -224,14 +350,32 @@ function compile_Object(node)
 
 	decTabs();
 
-	result += "\n}";
+	result += `\n${tabs}}`;
 	return result;
 }
 
 function compile_ObjectMember(node)
 {
-	let result = doCompileLookup(node.key) +
-		": " + doCompileLookup(node.value);
+	const key = doCompileLookup(node.key);
+
+	if(node.kind && node.kind !== "init") 
+	{
+		let value;
+		if(node.value instanceof AST.Function) {
+			value = compile_Function(node.value, true);
+		}
+		else {
+			value = doCompileLookup(node.value);
+		}
+
+		result = node.kind + " " + key + " " + value;
+	}
+	else 
+	{
+		const value = doCompileLookup(node.value);
+		result = key + ": " + value;
+	}
+
 	return result;
 }
 
@@ -239,7 +383,7 @@ function compile_Binary(node)
 {
 	let result;
 
-	if(node.left.type === "binary") {
+	if(node.left.type === "Binary") {
 		result = "(" + doCompileLookup(node.left) + ")";
 	}
 	else {
@@ -248,7 +392,7 @@ function compile_Binary(node)
 
 	result += " " + node.op + " ";
 
-	if(node.right.type === "binary") {
+	if(node.right.type === "Binary") {
 		result += "(" + doCompileLookup(node.right) + ")";
 	}
 	else {
@@ -274,10 +418,40 @@ function compile_Update(node)
 
 function compile_Call(node)
 {
-	let result = doCompileLookup(node.value);
-	result += "(" + compile_Args(node.args) + ")";
+	if(context.flags.transpiling) {
+		return compile_Call_ecma5(node);
+	}
+
+	return compile_Call_ecma6(node);
+}
+
+function compile_Call_ecma5(node)
+{
+	const value = doCompileLookup(node.value);
+	const args = compile_Args(node.args);
+
+	let result;
+
+	if(node.value.type === "Super" || 
+	   (node.value.type == "Name" && node.value.parent.type === "Super")) 
+	{
+		result = value + ".call(this";
+		if(args) {
+			result += ", " + args;
+		}
+		result += ")";
+	}
+	else {
+		result = value + "(" + args + ")";	
+	}
 
 	return result;
+}
+
+function compile_Call_ecma6(node)
+{
+	let result = doCompileLookup(node.value);
+	result += "(" + compile_Args(node.args) + ")";	
 }
 
 function compile_Args(args)
@@ -295,17 +469,25 @@ function compile_Args(args)
 	return result;
 }
 
-function compile_Function(node, withoutFunc)
+function compile_Function(node, withoutFunc, funcName)
 {
-	let funcName = doCompileLookup(node.id);
+	if(!funcName)
+	{
+		funcName = doCompileLookup(node.id);
+		if(funcName) {
+			funcName = " " + funcName;
+		}
+	}
+	else {
+		funcName = " " + funcName;
+	}
 
 	let result = "";
 	if(!withoutFunc) {
-		result = "function ";
+		result = "function";
 	}
 
-	result += funcName + 
-		"(" + compile_Args(node.params) + ") " +
+	result += funcName + "(" + compile_Args(node.params) + ") " +
 		compile_Block(node.body);
 
 	return result;
@@ -369,7 +551,12 @@ function compile_Block(node, appendFunc)
 
 function compile_Return(node)
 {
-	let result = "return " + doCompileLookup(node.arg);
+	let content = doCompileLookup(node.arg);
+	let result = "return";
+	if(content) {
+		result += " " + content;
+	}
+	
 	return result;
 }
 
@@ -391,7 +578,7 @@ function compile_If(node)
 	{
 		if(node.alternate.type === "If")
 		{
-			result += tabs + "\nelse " + compile_If(node.alternate);
+			result += "\n" + tabs + "else " + compile_If(node.alternate);
 		}
 		else
 		{
@@ -400,11 +587,11 @@ function compile_If(node)
 			if(node.alternate.type !== "Block") 
 			{
 				incTabs();
-				result += tabs + doCompileLookup(node.alternate) + ";\n";
+				result += doCompileLookup(node.alternate) + ";\n";
 				decTabs();
 			}
 			else {
-				result += tabs + doCompileLookup(node.alternate);
+				result += doCompileLookup(node.alternate);
 			}
 
 			result += tabs;
@@ -416,8 +603,7 @@ function compile_If(node)
 
 function compile_Conditional(node)
 {
-	let result = "(" + 
-		doCompileLookup(node.test) + ") ? " +
+	let result = doCompileLookup(node.test) + " ? " +
 		doCompileLookup(node.consequent) + " : " +
 		doCompileLookup(node.alternate);
 
@@ -426,13 +612,23 @@ function compile_Conditional(node)
 
 function compile_Unary(node)
 {
+	let arg = doCompileLookup(node.arg);
+	if(node.arg.type === "Binary" || node.op === "void") {
+		arg = "(" + arg + ")";
+	}
+
+	let op = node.op;
+	if(op === "typeof" || op === "delete") {
+		op += " ";
+	}
+
 	let result;
 
 	if(node.prefix) {
-		result = node.op + " " + doCompileLookup(node.arg);
+		result = op + arg;
 	}
 	else {
-		result = doCompileLookup(node.arg) + " " + node.op;
+		result = arg + op;
 	}
 
 	return result;
@@ -448,7 +644,7 @@ function compile_Switch(node)
 
 	decTabs();
 
-	result += "}";
+	result += tabs + "}";
 
 	return result;
 }
@@ -522,6 +718,10 @@ function compile_ForIn(node)
 
 function compile_While(node)
 {
+	if(node.body instanceof AST.EmptyStatement) { 
+		return ""; 
+	}
+
 	let result = "while(" +
 		doCompileLookup(node.test) + ") " + 
 		doCompileLookup(node.body);
@@ -533,7 +733,7 @@ function compile_DoWhile(node)
 {
 	let result = "do " + 
 		doCompileLookup(node.body) + 
-		"while(" + doCompileLookup(node.test) + ")";
+		" while(" + doCompileLookup(node.test) + ")";
 
 	return result;
 }
@@ -575,6 +775,13 @@ function compile_Try(node)
 	return result;
 }
 
+function compile_Throw(node)
+{
+	const result = "throw " + doCompileLookup(node.arg);
+
+	return result;
+}
+
 function compile_Import(node) 
 {
 	const specifiers = node.specifiers;
@@ -588,16 +795,16 @@ function compile_Import(node)
 		for(let key in specifiers)
 		{
 			if(node.imported) {
-				result += `const ${key} = exports.${node.sourceFile.id}`;
+				result += `const ${key} = exports[${node.sourceFile.id}]`;
 			}
 			else 
 			{
 				if(!added) {
 					added = true;
-					result += `const ${specifiers[key]} = exports.${node.sourceFile.id}.${key}`;
+					result += `const ${specifiers[key]} = exports[${node.sourceFile.id}].${key}`;
 				}
 				else {
-					result += `;\n${tabs}const ${specifiers[key]} = exports.${node.sourceFile.id}.${key}`;
+					result += `;\n${tabs}const ${specifiers[key]} = exports[${node.sourceFile.id}].${key}`;
 				}
 			}
 		}
@@ -655,46 +862,243 @@ function compile_Export(node)
 
 function compile_Class(node)
 {
-	let result = "class " + doCompileLookup(node.id);
+	if(context.flags.transpiling) {
+		return compile_Class_ecma5(node);
+	}
 
-	if(node.superCls) {
-		result += " extends " + doCompileLookup(node.superCls);
+	return compile_Class_ecma6(node);
+}
+
+function compile_Class_ecma5(node)
+{
+	clsCtx.inside = true;
+	clsCtx.id = doCompileLookup(node.id);
+	clsCtx.superCls = doCompileLookup(node.superCls);
+
+	let result = compile_ClassBody_ecma5(node.body);
+
+	if(clsCtx.superCls) {
+		requirements.inherits = true;
+		result += "\n" + tabs + "_inherits(" + clsCtx.id + ", " + clsCtx.superCls + ");\n"; 
+	}
+
+	clsCtx.inside = false;
+
+	return result;
+}
+
+function compile_Class_ecma6(node)
+{
+	let result = "class " + clsCtx.id;
+
+	if(clsCtx.superCls) {
+		result += " extends " + doCompileLookup(clsCtx.superCls);
 	}
 
 	result += " {\n";
 
 	incTabs();
-	result += compile_ClassBody(node.body);
+	result += compile_ClassBody_ecma6(node.body);
 	decTabs();
 
 	result += tabs + "}";
 
-	return result;
+	return result;		
 }
 
-function compile_ClassBody(node)
+function compile_ClassBody_ecma6(node)
 {
 	let result = "";
 
 	const buffer = node.buffer;
 	for(let n = 0; n < buffer.length; n++) {
 		let bufferNode = buffer[n];
-		result += tabs + compile_MethodDef(bufferNode) + "\n";
+		result += tabs + compile_MethodDef(bufferNode, true) + "\n";
 	}
 
 	return result;
 }
 
-function compile_MethodDef(node)
+function compile_ClassBody_ecma5(node)
+{
+	let constrResult;
+	let proto = "";
+
+	incTabs();
+
+	const buffer = node.buffer;
+	for(let n = 0; n < buffer.length; n++) 
+	{
+		const bufferNode = buffer[n];
+
+		if(bufferNode.kind === "constructor") {
+			decTabs();
+			clsCtx.insideConstr = true;
+			constrResult = compile_Function(bufferNode.value, false, clsCtx.id) + "\n";
+			clsCtx.insideConstr = false;
+			incTabs();
+		}
+		else 
+		{
+			const protoDecl = proto ? ",\n" : "";
+			proto += protoDecl + tabs + compile_MethodDef_ecma5(bufferNode);
+		}
+	}
+
+	decTabs();
+
+	if(!constrResult) {
+		constrResult = "function " + clsCtx.id + "() {};\n";
+	}
+
+	if(proto) {
+		proto = tabs + clsCtx.id + ".prototype = {\n" + proto + "\n" + tabs + "};\n";
+	}
+
+	const result = constrResult + proto;
+
+	return result;	
+}
+
+function compile_MethodDef_ecma6(node)
 {
 	const key = doCompileLookup(node.key);
 
-	let result = key + compile_Function(node.value, true);
+	let result = "";
+	if(node.kind === "get" || node.kind === "set") {
+		result = node.kind + " ";
+	}
+	result += key + compile_Function(node.value, true);
+	
 	return result;
 }
 
-function compile_This(node) {
+function compile_MethodDef_ecma5(node)
+{
+	const key = doCompileLookup(node.key);
+
+	let result = "";
+	if(node.kind === "get" || node.kind === "set") {
+		result = node.kind + " " + key + compile_Function(node.value, true);
+	}
+	else {
+		result = key + ": " + compile_Function(node.value, false);
+	}
+	
+	return result;
+}
+
+function compile_ThisExpression(node) {
 	return "this";
+}
+
+function compile_LogicalExpression(node)
+{
+	const left = doCompileLookup(node.left);
+	const right = doCompileLookup(node.right);
+
+	const result = `${left} ${node.op} ${right}`;
+	return result;
+}
+
+function compile_ArrowFunctionExpression(node)
+{
+	const result = "(" + compile_Args(node.params) + ") => " + doCompileLookup(node.body);
+	return result;
+}
+
+function compile_Super(node)
+{
+	if(context.flags.transpiling) {
+		return compile_Super_ecma5(node);
+	}
+
+	const result = "super";
+	return result;
+}
+
+function compile_Super_ecma5(node)
+{
+	let result;
+
+	if(clsCtx.insideConstr) {
+		result = clsCtx.superCls;
+	}
+	else {
+		result = clsCtx.superCls + ".prototype";
+	}
+
+	return result;
+}
+
+function compile_TemplateLiteral(node)
+{
+	let result = "\"";
+
+	const expressions = node.expressions;
+	const quasis = node.quasis;
+	const num = quasis.length - 1;
+
+	if(num === 0) {
+		result += compile_Quasis(quasis[0]);
+	}
+	else
+	{
+		for(let n = 0; n < quasis.length - 1; n++) {
+			result += compile_Quasis(quasis[n]) + "\" + " + getNameFromNode(expressions[n]) + " + \""; 
+		}
+
+		result += quasis[num].value;
+	}
+
+	result += "\"";
+
+	return result;
+}
+
+function compile_Quasis(node)
+{
+	let result = node.value.replace(/\n/g, "\\n")
+						   .replace(/\t/g, "\\t")
+						   .replace(/\"/g, "\\\"");
+	return result;
+}
+
+function compile_EmptyStatement(node) {
+	return "";
+}
+function compile_ExportSpecifier(node)
+{
+	let result;
+
+	if(node.local.value === node.exported.value) {
+		result = node.local.value;
+	}
+	else {
+		result = node.exported.value + ": " + node.local.value;
+	}
+
+	return result;
+}
+
+// TODO: Temporary solution
+function compile_ExportDefaultDeclaration(node)
+{
+	const decl = node.decl;
+
+	let result = `exports[${context.currSourceFile.id}] = `;
+	
+	if(decl instanceof AST.Binary) {
+		 result += doCompileLookup(decl.right);
+	}
+	else if(decl instanceof AST.Class) {
+		result = doCompileLookup(decl) + tabs + result + doCompileLookup(decl.id);
+	}
+	else {
+		result += doCompileLookup(decl);
+	}
+
+	return result;
 }
 
 function incTabs() 
@@ -726,8 +1130,8 @@ const compileLookup = {
 	Null: compile_Null,
 	Name: compile_Name,
 	VariableDeclaration: compile_VariableDeclaration,
-	array: compile_Array,
-	object: compile_Object,
+	Array: compile_Array,
+	Object: compile_Object,
 	Binary: compile_Binary,
 	Update: compile_Update,
 	Call: compile_Call,
@@ -747,10 +1151,17 @@ const compileLookup = {
 	Label: compile_Label,
 	Sequence: compile_Sequence,
 	Try: compile_Try,
+	Throw: compile_Throw,
 	Import: compile_Import,
 	Export: compile_Export,
 	Class: compile_Class,
-	This: compile_This
+	ThisExpression: compile_ThisExpression,
+	LogicalExpression: compile_LogicalExpression,
+	ArrowFunctionExpression: compile_ArrowFunctionExpression,
+	Super: compile_Super,
+	TemplateLiteral: compile_TemplateLiteral,
+	EmptyStatement: compile_EmptyStatement,
+	ExportDefaultDeclaration: compile_ExportDefaultDeclaration
 };
 
 module.exports = {

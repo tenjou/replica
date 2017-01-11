@@ -1,256 +1,42 @@
+const exec = require("child_process").exec;
+const os = require("os");
 const fs = require("fs");
 const path = require("path");
-const FSEvent = process.binding("fs_event_wrap").FSEvent;
+const childProcess = require("child_process");
 const uglifyJS = require("uglify-js");
-const lexer = require("./lexer.js");
-const compiler = require("./compiler.js");
+const watcher = require("./watcher");
+const lexer = require("./lexer");
+const server = require("./server/server");
+const package = require("../package.json");
+const cli = require("./cli");
+const utils = require("./utils");
 
-let watching = {};
-let flags = {};
-let indexFiles = {};
+const needUpdate = {
+	indexFile: false,
+	files: false
+};
+
+const indexFiles = {};
 let filesChanged = {};
-let inputs = [];
-let actionsUpdateIndex = false;
-let actionsChanged = false;
-let watchingFiles = false;
-let updateIndex = 1;
 let packageSrc = "./package.js";
+let buildSrc = "./build/";
+let entrySourceFile = null;
 
-function loadFile(input, src)
+watcher.setEventListener((type, dir, file) => 
 {
-	const dirSrc = path.dirname(src);
-	const fileSrc = path.basename(src);
-
-	createSource(input, path.normalize(dirSrc + "/"), fileSrc);
-	watchDirectory(input, dirSrc);
-}
-
-function loadDirectory(input, src) 
-{
-	const dirSrc = path.normalize(src + "/");
-	const dirContent = fs.readdirSync(src);
-
-	for(let n = 0; n < dirContent.length; n++) 
-	{
-		const fileSrc = dirContent[n];
-		const stats = fs.statSync(dirSrc + fileSrc);
-
-		if(stats.isDirectory()) {
-			loadDirectory(input, dirSrc + fileSrc);
-		}
-		else {
-			createSource(input, dirSrc, fileSrc);
-		}
+	if(type === "update") {
+		filesChanged[file.rootPath + file.filename] = file;
+		needUpdate.files = true;
 	}
+});
 
-	watchDirectory(input, src);
-}
-
-function watchDirectory(input, src) 
-{
-	if(!flags.watch && !flags.w) { return; }
-	if(watching[src]) { return; }
-
-	let watchSrc = path.normalize(src + "/");
-	let handle = new FSEvent();
-	handle.onchange = function(status, eventType, filename) {
-		watchDirectoryFunc(input, watchSrc, eventType, filename);
-	};
-
-	watching[src] = handle;
-	handle.start(src);
-}
-
-function watchDirectoryFunc(input, src, eventType, filename)
-{
-	const fullSrc = src + filename;
-	if(fullSrc === packageSrc) { return; } 
-
-	const fileExist = fs.existsSync(fullSrc);
-	
-	switch(eventType) 
-	{
-		case "rename":
-		{
-			if(fileExist) 
-			{
-				const isDirectory = fs.statSync(fullSrc).isDirectory();
-
-				if(isDirectory) {
-					loadDirectory(input, fullSrc);
-				}
-				else 
-				{
-					if(input.staticSources && !input.staticSources[fullSrc]) {
-						break;
-					}
-
-					createSource(input, src, filename);
-				}
-			}
-			else 
-			{
-				if(watching[fullSrc]) {
-					removeDirectory(input, fullSrc);
-				}
-				else {
-					removeSource(input, fullSrc);
-				}
-			}
-		} break;
-
-		case "change":
-		{
-			filesChanged[fullSrc] = true;
-			actionsChanged = true;
-		} break;
-	}
-}
-
-function unwatchDirectory(src)
-{
-	var watchFunc = watching[src];
-	if(watchFunc) {
-		watchFunc.close();
-		delete watching[src];
-	}
-}
-
-function Input(src)
-{
-	this.src = src;
-	this.sources = {};
-	this.staticSources = null;
-	
-	const isDirectory = fs.lstatSync(src).isDirectory();
-
-	if(isDirectory) {
-		loadDirectory(this, src);
-	}
-	else 
-	{
-		this.staticSources = {};
-		this.staticSources[src] = true;
-		loadFile(this, src);
-	}
-}
-
-function SourceFile(path, filename)
-{
-	this.path = path;
-	this.filename = filename;
-	this._content = null;
-	this.index = 0;
-	this.requires = [];
-	this.timestamp = "";
-
-	this.bufferLength = 0;
-	this.cursor = 0;
-	this.currChar = null;
-
-	this.update();
-}
-
-SourceFile.prototype = 
-{
-	nextRequire: function()
-	{
-		this.currChar = null;
-
-		do {
-			this.nextChar();
-		} while(isSpace(this.currChar))
-
-		let str = "";
-
-		if(this.currChar === "\"" || this.currChar === "'") 
-		{
-			let endChar = this.currChar;
-
-			this.nextChar();
-			while(this.currChar !== endChar)
-			{
-				if(this.currChar === "\0") {
-					return null;
-				}
-
-				str += this.currChar;
-				this.nextChar();
-			}
-
-			if(str === "use strict") { return null; }
-			if(str.indexOf("require ") !== 0) { return null;}
-
-			return str.slice("require ".length);
-		}
-
-		return null;
-	},
-
-	nextChar: function() 
-	{
-		if(this.cursor >= this.bufferLength) {
-			this.currChar = "\0";
-		}
-		else {
-			this.currChar = this._content.charAt(this.cursor);
-		}
-
-		this.cursor++;
-	},
-
-	update: function() 
-	{
-		this.content = fs.readFileSync(this.path + this.filename, "utf8");
-
-		if(flags.timestamp) {
-			this.timestamp = "?" + Date.now();
-		}
-
-		actionsUpdateIndex = true;
-	},
-
-	set content(value)
-	{
-		this._content = value;
-		this.bufferLength = value.length;
-		this.requires.length = 0;
-
-		let index = value.indexOf("\"require ");
-		if(index === -1) { return; }
-
-		this.cursor = 0;
-
-		let errorCount = 0;
-
-		for(;;)
-		{
-			let requireFile = this.nextRequire();
-			if(!requireFile) 
-			{ 
-				errorCount++; 
-
-				if(errorCount === 2) { 
-					break;
-				}
-				else {
-					continue;
-				}
-			}
-			
-			let requirePath = path.resolve(this.path + requireFile + ".js");
-			this.requires.push(requirePath);
-		}
-	},
-
-	get content() {
-		return this._content;
-	}
+function setBuildDir(dir) {
+	buildSrc = dir;
 }
 
 class IndexFile
 {
-	constructor(path, filename, content) 
+	constructor(rootPath, filename, content) 
 	{
 		this.contentStart = null;
 		this.contentEnd = null;
@@ -258,7 +44,7 @@ class IndexFile
 		this.updating = false;
 		this.loaded = false;
 
-		this.path = path;
+		this.rootPath = rootPath;
 		this.filename = filename;
 		this.timestamp = "";
 
@@ -266,8 +52,8 @@ class IndexFile
 	}
 
 	update() {
-		this.content = fs.readFileSync(this.path + this.filename, "utf8");
-		actionsUpdateIndex = true;
+		this.content = fs.readFileSync(this.rootPath + this.filename, "utf8");
+		needUpdate.indexFile = true;
 	}
 
 	updateScripts()
@@ -276,37 +62,69 @@ class IndexFile
 
 		let content = this.contentStart;
 
-		if(flags.concat) 
+		if(cli.flags.concat) 
 		{
 			let timestamp = "";
-			if(flags.timestamp) {
+			if(cli.flags.timestamp) {
 				timestamp = "?" + Date.now();
 			}
 
-			let src = path.relative(this.path + "/", packageSrc);
-
+			const src = path.relative(this.rootPath + "/", packageSrc);
 			content += `<script src="${src}${timestamp}"></script>\n`;
+
+			if(cli.flags.server) {
+				content += `<script>window.REPLICA_SERVER_PORT = ${server.getHttpPort()};</script>\n`;
+				content += `<script src="${src}replica.js"></script>\n`;
+			}			
 		}
 		else
 		{
-			let self = this;
+			const imports = lexer.getImports(entrySourceFile);
+			const src = path.relative(this.rootPath, buildSrc) + path.normalize("/");
 
-			iterSources(
-				function(source) 
+			if(cli.flags.timestamp)
+			{
+				let timestamp;
+
+				for(let n = 0; n < imports.length; n++) 
 				{
-					let src = path.relative(self.path + "/", source.path);
-					if(src) {
-						src = path.normalize(src + "/");
-					}
+					const file = imports[n];
+					if(!file.blockNode) { continue; }
 
-					content += `<script src="${src}${source.filename}${source.timestamp}"></script>\n`;
-				});
+					timestamp = "?" + Date.now();
+					content += `<script src="${src}${file.filename}.${file.id}.js${timestamp}"></script>\n`;
+				}
+
+				if(file.blockNode) {
+					timestamp = "?" + Date.now();
+					content += `<script src="${src}${entrySourceFile.filename}.${entrySourceFile.id}.js${timestamp}"></script>\n`;
+				}
+			}
+			else
+			{
+				for(let n = 0; n < imports.length; n++) 
+				{
+					const file = imports[n];
+					if(!file.blockNode) { continue; }
+
+					content += `<script src="${src}${file.filename}.${file.id}.js"></script>\n`;
+				}
+
+				if(entrySourceFile.blockNode) {
+					content += `<script src="${src}${entrySourceFile.filename}.${entrySourceFile.id}.js"></script>\n`;
+				}
+			}
+
+			if(cli.flags.server) {
+				content += `<script>window.REPLICA_SERVER_PORT = ${server.getHttpPort()};</script>\n`;
+				content += `<script src="${src}replica.js"></script>\n`;
+			}			
 		}
 
 		content += this.contentEnd;
 		this.updating = true;
 
-		fs.writeFile(this.path + this.filename, content);
+		fs.writeFile(this.rootPath + this.filename, content);
 	}
 
 	set content(content)
@@ -356,116 +174,47 @@ class IndexFile
 
 	get content() {
 		return this._content;
-	}	
-}
-
-function createSource(input, src, filename)
-{
-	const fullSrc = src + filename;
-
-	if(fullSrc === packageSrc) { return; }
-
-	let index = filename.lastIndexOf(".");
-	if(index === -1) { return; }
-
-	let ext = filename.slice(index + 1);
-	if(ext !== "js") { return; }
-
-	input.sources[fullSrc] = new SourceFile(src, filename);
-
-	actionsUpdateIndex = true;
-}
-
-function removeSource(input, src)
-{
-	if(!input.sources[src]) { return; }
-
-	delete input.sources[src];
-	actionsUpdateIndex = true;
-}
-
-function removeDirectory(input, src)
-{
-	let watchFunc = watching[src];
-	if(!watchFunc) { return; }
-
-	watchFunc.close();
-	delete watching[src];
-
-	for(var key in input.sources) 
-	{
-		if(key.indexOf(src) === 0) {
-			removeSource(input, key);
-		}
 	}
 }
 
-function iterSources(cb)
+function addIndex(src) 
 {
-	updateIndex++;
-
-	for(let n = 0; n < inputs.length; n++)
-	{
-		let sources = inputs[n].sources;
-
-		for(let key in sources) {
-			iterSource(sources, sources[key], cb);
-		}
-	}
-}
-
-function iterSource(sources, source, cb)
-{
-	if(source.index === updateIndex) { return; }
-	source.index = updateIndex;
-
-	iterSourceIncludes(sources, source, cb);
-
-	cb(source);
-}
-
-function iterSourceIncludes(sources, source, cb)
-{
-	let includes = source.requires;
-
-	for(let n = 0; n < includes.length; n++)
-	{
-		let src = includes[n];
-		let includeSource = sources[src];
-		if(!includeSource) {
-			console.warn("No such file found: " + src + "\n  Referenced in: " + (source.path + source.filename));
-			continue;
-		}
-
-		iterSource(sources, includeSource, cb);
-	}
-}
-
-function concatSources()
-{
-	logMagenta("compiling", packageSrc);
-
-	let content = "";
-
-	iterSources(
-		function(source) {
-			if(source.content) {
-				content += source.content + "\n";
-			}
-		});
-
-	if(flags.uglify) {
-		content = uglifySources(content);
+	const fileExist = fs.existsSync(src);
+	if(!fileExist) {
+		return console.warn("\x1b[91m", "No such index file found at: " + src, "\x1b[0m");
 	}
 
-	fs.writeFileSync(packageSrc, content);
+	let slash = path.normalize("/");
+	let absoluteSrc = path.resolve(src);
+	let index = absoluteSrc.lastIndexOf(slash);
+	let filename = absoluteSrc.slice(index + 1);
 
-	logMagenta("finished", "");
+	let content = fs.readFileSync(absoluteSrc);
+	let indexFile = new IndexFile(absoluteSrc.slice(0, index + 1), filename, content);
+	indexFiles[absoluteSrc] = indexFile;
+	watcher.watchFile(indexFile);
+
+	utils.logGreen("IndexFile", absoluteSrc);
 }
 
-function uglifySources(content)
+function concatFiles()
 {
-	logMagenta("uglifying", "");
+	utils.logMagenta("Compiling", packageSrc);
+
+	let content = lexer.compileAll(entrySourceFile);
+
+	if(cli.flags.uglify) {
+		content = uglifyContent(content);
+	}
+
+	fs.writeFileSync(packageSrc, content, "utf8");
+
+	utils.logMagenta("Ready", "");
+}
+
+function uglifyContent(content)
+{
+	utils.logMagenta("Uglifying", "");
 
 	let result = null;
 
@@ -489,311 +238,107 @@ function uglifySources(content)
 
 function updateTick()
 {
-	if(actionsChanged)
+	if(needUpdate.files)
 	{
 		let contentChanged = false;
 
+		const imports = lexer.getImports(entrySourceFile);
+		const firstImportFile = (imports && imports.length > 0) ? imports[0] : entrySourceFile;
+
 		for(let key in filesChanged)
 		{
-			let index = key.lastIndexOf(".");
-			if(index === -1) { continue; }
+			const file = filesChanged[key];
+			const ext = path.extname(key);
 
-			let source;
-			let ext = key.slice(index + 1);
-			if(ext === "js") 
+			if(ext === ".html")
 			{
-				for(let n = 0; n < inputs.length; n++) 
-				{
-					source = inputs[n].sources[key];
-					if(source) { 
-						break; 
-					}
+				if(file.updating) {
+					file.updating = false
+					continue;
 				}
 
-				if(!source) { continue; }
+				utils.logYellow("Update", "IndexFile: " + key);
+				file.update();
+				
+			}
+			else
+			{
+				utils.logYellow("Update", "File: " + key);
+				file.update();
+
+				if(file.blockNode && !cli.flags.concat) {
+					fs.writeFileSync(buildSrc + file.filename + "." + file.id + ".js", lexer.compile(file, (file === firstImportFile)), "utf8");
+				}
 
 				contentChanged = true;
 			}
-			else 
-			{
-				source = indexFiles[key];
-				if(!source) { continue; }
-
-				if(source.updating) {
-					source.updating = false
-					continue;
-				}
-			}
-
-			logYellow("update", "File: " + key);
-
-			source.update();
 		}
 
 		filesChanged = {};
-		actionsChanged = false;
+		needUpdate.files = false;
 
-		if(contentChanged && flags.concat) {
-			concatSources();		
+		if(contentChanged) 
+		{
+			if(cli.flags.concat) {
+				concatFiles();
+			}
+
+			for(const key in indexFiles) {
+				const source = indexFiles[key];
+				source.updateScripts();
+			}
 		}
-	}
 
-	if(actionsUpdateIndex) 
+		if(cli.flags.server) {
+			server.reload();
+		}		
+	}
+}
+
+function makeProject(dir) 
+{
+	const exists = fs.existsSync(dir);
+	if(exists) 
 	{
-		for(let key in indexFiles) {
-			let source = indexFiles[key];
-			source.updateScripts();
+		if(fs.lstatSync(dir).isDirectory()) {
+			return console.warn("Could not make project - directory already exists");
 		}
-
-		actionsUpdateIndex = false;
-	}
-}
-
-function startWatching()
-{
-	if(watchingFiles) { return; }
-	watchingFiles = true;
-
-	setInterval(function() {
-		updateTick();
-	}, 100);
-}
-
-function deleteFolder(folderPath) 
-{
-	if(!fs.existsSync(folderPath)) {
-		return;
+		else {
+			return console.warn("Could not make project - there is a file with such name");
+		}
 	}
 
-	fs.readdirSync(folderPath).forEach(
-		(file, index) => {
-			let currPath = folderPath + "/" + file;
-			if(fs.lstatSync(currPath).isDirectory()) { 
-				deleteFolder(currPath);
-			} 
+	const templatePath = path.normalize(__dirname + "/../templates/basic");
+
+	fs.mkdirSync(dir);
+
+	copyFiles(dir, templatePath, () => 
+	{
+		console.log("Installing dependencies:\n");
+		exec(`cd ${dir} && npm i`, (error, stdout, stderr) => {
+			if(error) {
+				console.error(error);
+			}
 			else {
-				fs.unlinkSync(currPath);
+				console.log(stdout);
 			}
 		});
-
-	fs.rmdirSync(path);
+	});
 }
 
-function defaultInit(src)
+function printVersion() {
+	const package = require("../package.json");
+	console.log(`${package.name} ${package.version}v`)
+}
+
+function resolveBuildDir()
 {
-	// flags.watch = true;
-	// flags.timestamp = true;
+	buildSrc = path.resolve(buildSrc) + path.normalize("/");
 
-	const rootPath = path.dirname(path.resolve(src)) + path.normalize("/");
-	const filename = path.basename(src);
+	removeDir(buildSrc);
+	createRelativeDir(buildSrc);
 
-	deleteFolder("./build");
-	fs.mkdirSync("./build");
-
-	const sourceFile = lexer.parse(rootPath, filename, 
-		(rootPath, path, func) => {
-			console.log("[rootPath]", rootPath);
-			console.log("[path]", path);
-			func(fs.readFileSync(rootPath + path));
-		},
-		(sourceFile) => {
-			compiler.compile(sourceFile, { },
-				(file, content) => {
-					console.log("---[FILE]:", file.id);
-					console.log(content);
-					
-					fs.writeFileSync("build/" + file.id + ".js", content);
-				});
-		});
-	
-
-	// addInput(src);
-
-	// const fileExist = fs.existsSync(src + "/index.html");
-	// if(fileExist) {
-	// 	addIndex(src + "/index.html");
-	// }	
-}
-
-function processArgs() 
-{
-	const args = process.argv.slice(2);
-	const numArgs = args.length;
-
-	if(numArgs === 1 && args[0][0] !== "-") {
-		defaultInit(args[0]);
-	}
-	else if(numArgs === 0) {
-		defaultInit("./main.js");
-	}
-	else
-	{
-		for(let n = 0; n < numArgs; n++)
-		{
-			let flag = args[n];
-			if(flag.indexOf("--") !== -1) 
-			{
-				let flagName = flag.slice(2);
-				flags[flagName] = true;
-			}
-			else if(flag.indexOf("-") !== -1) 
-			{
-				let flagName = flag.slice(1);
-				flags[flagName] = true;
-			}
-		}
-
-		for(let n = 0; n < numArgs; n++)
-		{
-			let flag = args[n];
-			if(flag.indexOf("-") !== -1) 
-			{
-				let flagArgs = [];
-				
-				for(n++; n < numArgs; n++) 
-				{
-					let arg = args[n];
-
-					if(arg.indexOf("-") === -1) {
-						flagArgs.push(arg);
-					}
-					else {
-						n--;
-						break;
-					}
-				}
-
-				handleArg(flag, flagArgs);
-			}
-		}
-	}
-}
-
-function handleArg(flag, args)
-{
-	switch(flag)
-	{
-		case "-i":
-		case "--input":
-			addInput(args[0]);
-			break;
-
-		case "-I":
-		case "--index":
-			addIndex(args[0]);
-			break;
-
-		case "-c":
-		case "--concat":
-			if(args[0]) {
-				packageSrc = args[0];
-			}
-			break;
-
-		case "-u":
-		case "--uglify":
-			flags.concat = true;
-			break;
-
-		case "-h":
-		case "--help":
-			printHelp();
-			break;
-
-		case "-v":
-		case "--version":
-			logYellow("version", require("./package.json").version);
-			break;
-	}
-}
-
-function addInput(src) 
-{
-	const inputSrc = path.resolve(src);
-
-	if(!fs.existsSync(inputSrc)) {
-		return logError("Input not found: " + inputSrc);
-	}
-
-	let input = new Input(inputSrc);
-	inputs.push(input);
-
-	if(input.staticSources) {
-		logGreen("input", "File: " + inputSrc);
-	}
-	else {
-		logGreen("input", "Directory: " + inputSrc);
-	}
-}
-
-function addIndex(src) 
-{
-	const fileExist = fs.existsSync(src);
-	if(!fileExist) {
-		return console.warn("\x1b[91m", "No such index file found at: " + src, "\x1b[0m");
-	}
-
-	let slash = path.normalize("/");
-	let absoluteSrc = path.resolve(src);
-	let index = absoluteSrc.lastIndexOf(slash);
-	let filename = absoluteSrc.slice(index + 1);
-
-	let content = fs.readFileSync(absoluteSrc);
-	let indexFile = new IndexFile(absoluteSrc.slice(0, index + 1), filename, content);
-	indexFiles[absoluteSrc] = indexFile;
-
-	logGreen("output", "Index file: " + absoluteSrc);
-}
-
-function logGreen(type, text) {
-	console.log(createTimestamp(), "\x1b[92m" + type, "\x1b[0m" + text);	
-}
-
-function logYellow(type, text) {
-	console.log(createTimestamp(), "\x1b[33m" + type, "\x1b[0m" + text);	
-}
-
-function logMagenta(type, text) {
-	console.log(createTimestamp(), "\x1b[35m" + type, "\x1b[0m" + text);	
-}
-
-function logError(text) {
-	console.log(createTimestamp(), "\x1b[91m" + "Error: " + text, "\x1b[0m");	
-}
-
-function createTimestamp() 
-{
-	const date = new Date();
-	const hour = date.getHours();
-	const minutes = date.getMinutes();
-	const seconds = date.getSeconds();
-	const milliseconds = date.getMilliseconds();
-
-	return "[" +
-		((hour < 10) ? "0" + hour: hour) +
-		":" +
-		((minutes < 10) ? "0" + minutes: minutes) +
-		":" +
-		((seconds < 10) ? "0" + seconds: seconds) +
-		"]";
-}
-
-function printHelp() 
-{
-	console.log("-i, --input <dir|file>             Specify an input folder. Order they are defined in also will change");
-	console.log("                                     order they are included.");
-	console.log("-I, --index <file>                 The path to output index file.");
-  	console.log("-w, --watch                        Look after file changes in set input folders.");
-	console.log("-c, --concat <file=./package.js>   Specify that files should be concatenated inside one file.");
-	console.log("-u, --uglify                       Specify that concatenated file should be minified.");
-	console.log("                                     Setting this will force --concat flag to true.");
-	console.log("-t, --timestamp                    Add timestamp to scripts inside index file.");
-	console.log("-h, --help                         Print help.");
-	console.log("-v, --version                      Current version number.");
-}
-
-function isSpace(c) {
-	return (c === " " || c === "\t" || c === "\r" || c === "\n" || c === ";");
+	copyFiles(buildSrc, path.normalize(__dirname + "/../templates/server"));
 }
 
 function resolveOutputDir()
@@ -812,49 +357,181 @@ function resolveOutputDir()
 		packageSrc += "package.js";
 	}
 
-	const relativeSrc = path.relative("./", packageSrc);
-	const index = relativeSrc.lastIndexOf(slash);
-	if(index !== -1)
+	// createRelativeDir(packageSrc);
+}
+
+function createRelativeDir(src)
+{
+	const slash = path.normalize("/");
+	const relativeSrc = path.relative("./", src);
+	const relativeBuffer = relativeSrc.split(slash);
+
+	let currSrc = "";
+	for(let n = 0; n < relativeBuffer.length; n++) 
 	{
-		const packageFolderSrc = relativeSrc.slice(0, index);
-		const relativeBuffer = packageFolderSrc.split(slash);
-
-		let currSrc = "";
-		for(let n = 0; n < relativeBuffer.length; n++) 
+		currSrc += relativeBuffer[n] + slash;
+		if(!fs.existsSync(currSrc)) 
 		{
-			currSrc += relativeBuffer[n] + slash;
-			if(!fs.existsSync(currSrc)) 
+			fs.mkdirSync(currSrc);
+
+			for(n++; n < relativeBuffer.length; n++)
 			{
-				console.log("Creating directories recursively: " + packageFolderSrc);
-
+				currSrc += relativeBuffer[n] + slash;
 				fs.mkdirSync(currSrc);
-
-				for(n++; n < relativeBuffer.length; n++)
-				{
-					currSrc += relativeBuffer[n] + slash;
-					fs.mkdirSync(currSrc);
-				}
 			}
 		}
 	}	
 }
 
-console.log("");
-processArgs();
+function removeDir(folderPath) 
+{
+	if(!fs.existsSync(folderPath)) {
+		return;
+	}
 
-if(inputs.length === 0) {
-	process.exit(1);
+	fs.readdirSync(folderPath).forEach(
+		(file, index) => {
+			let currPath = folderPath + "/" + file;
+			if(fs.lstatSync(currPath).isDirectory()) { 
+				removeDir(currPath);
+			} 
+			else {
+				fs.unlinkSync(currPath);
+			}
+		});
+
+	fs.rmdirSync(folderPath);
 }
 
-resolveOutputDir();
+function copyFiles(targetDir, srcDir, onDone)
+{
+	const absoluteTargetDir = path.resolve(targetDir);
+	const absoluteSrcDir = path.resolve(srcDir);
 
-if(flags.concat || flags.c) {
-	concatSources();
+	let cmd;
+	switch(os.platform())
+	{
+		case "win32":
+			cmd = `xcopy ${absoluteSrcDir} ${absoluteTargetDir} /s /e`;
+			break;
+
+		case "darwin":
+		case "linux":
+			cmd = `cp -r ${absoluteTargetDir}/* ${absoluteSrcDir}`;
+			break;	
+	}
+
+	exec(cmd, (error, stdout, stderr) => {
+		if(error) {
+			console.error(error);
+		}
+		else 
+		{
+			console.log(stdout);
+			if(onDone) {
+				onDone();
+			}
+		}
+	});
 }
 
-if(flags.watch || flags.w) {
-	startWatching();
+function setEntry(src)
+{
+	const entryPath = path.resolve(src);
+
+	if(!fs.existsSync(entryPath)) {
+		return utils.logError("EntryError", "File not found: " + src);
+	}
+
+	utils.logGreen("Entry", entryPath);
+
+	entrySourceFile = lexer.parseAll(entryPath);
+	if(!entrySourceFile) { return; }
+
+	watcher.watchFile(entrySourceFile);
+	filesChanged[entrySourceFile.rootPath + entrySourceFile.filename] = entrySourceFile;
+
+	const imports = lexer.getImports(entrySourceFile);
+	for(let n = 0; n < imports.length; n++) {
+		const file = imports[n];
+		watcher.watchFile(file);
+		filesChanged[file.rootPath + file.filename] = file;
+	}
 }
-else {
-	updateTick();
+
+function run(file) 
+{
+	setEntry(file);
+	
+	resolveBuildDir();
+	resolveOutputDir();
+
+	needUpdate.files = true;
+
+	if(cli.flags.server) 
+	{
+		cli.flags.watch = cli.flags.watch || {};
+		server.start(cli.flags.server.httpPort, cli.flags.server.wsPort, start);
+	}
+	else {
+		start();
+	}
 }
+
+function start()
+{
+	if(cli.flags.watch) 
+	{
+		if(cli.flags.server) {
+			utils.logMagenta("ServerOpened", `http://127.0.0.1:${server.getHttpPort()}`);
+			childProcess.spawn("explorer", [ `http://127.0.0.1:${server.getHttpPort()}` ]);
+		}
+
+		setInterval(() => {
+			updateTick();
+		}, 100);
+	}
+	else {
+		updateTick();
+	}	
+}
+
+console.log();
+
+cli.name(package.name)
+   .version(package.version)
+   .description(package.description)
+   .option("-i, --index <file>", "Add output index file", addIndex)
+   .option("-t, --timestamp", "Add timestamps to output files")
+   .option("-w, --watch", "Look after file changes in set input folders")
+   .option("-u, --uglify", "Specify that concatenated file should be minified, activates --concat")
+   .option("-c, --concat [file]", "Concat all files into one")
+   .option("-s, --server [httpPort] [wsPort]", "Launch development server, activates --watch")
+   .option("-b, --build <dir>", "Specify build directory", setBuildDir)
+   .command("make <dir>", "Create and prepare an empty project", makeProject)
+   .command("v", "\tPrints current version", printVersion)
+   .parse(process.argv, run);
+
+// function removeSource(input, src)
+// {
+// 	if(!input.sources[src]) { return; }
+
+// 	delete input.sources[src];
+// 	needUpdate.indexFile = true;
+// }
+
+// function removeDirectory(input, src)
+// {
+// 	let watchFunc = watching[src];
+// 	if(!watchFunc) { return; }
+
+// 	watchFunc.close();
+// 	delete watching[src];
+
+// 	for(var key in input.sources) 
+// 	{
+// 		if(key.indexOf(src) === 0) {
+// 			removeSource(input, key);
+// 		}
+// 	}
+// }

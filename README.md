@@ -3,18 +3,18 @@
 [![npm version](https://badge.fury.io/js/build-replica.svg)](https://badge.fury.io/js/build-replica)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-Replica is small and configureless build tool for most common actions you will find while developing front end JavaScript applications or libraries.
+Replica is small and very fast ECMA6 JavaScript CLI build tool and supports most common actions you will find while developing JavaScript applications or libraries.
 
 #### Features
-* Include all scripts automatically inside index html file
+* Supports ECMA6 transpiling and import syntax
+* Realtime watching for added/removed files
+* Development server with hot reload
 * Pack scripts into one file
 * Minify packed files
-* Realtime watching for added/removed files
 * Timestamp changed scripts in index html file
-* Simple embeded string syntax for requiring files/changing include order - such as "require <name>"
+* Fast boilerplate project creation from templates
 
-Replica approaches more classical way of building JavaScript projects by automatic file inclusion in HTML Index file for more speedy development and instantenous build time while developing projects.
-Also supports optional custom require syntax to change include order without need to manage files yourself.
+Replica by default only compiles and replaces files that are changed without needing to compile big files for every changes.
 
 ## Installation
 
@@ -24,68 +24,51 @@ npm install -g build-replica
 
 ## Usage
 
-#### 1. Plug & play
-Most simple approach while developing front end projects with HTML index file. 
-By default this option will search for "index.html" file and include all JavaScript files that are inside folder and will watch for file changes.
+#### 1. Simplest development setup
 ```
-build-replica
-```
-Equivalent to:
-```
-build-replica --input ./ --index index.html --watch --timestamp
+build-replica src/main.js -i index.html -s -t
 ```
 
-#### 2. Customized development build
+#### 2. Simplest production setup
 ```
-build-replica --input lib --input src --index index.html --watch --timestamp
-```
-
-#### 3. Production ready compilation
-```
-build-replica --input lib --input src --index index.html --uglify --timestamp
+build-replica src/main.js -i index.html -u -t
 ```
 
-#### 4. Compile library
-```
-build-replica --input lib --concat build/my_package.js --uglify
-```
-
-## Custom include order
-Replica supports optional way of changing file include order by specifying `require <filename_without_extension>` at the top of file content.
-
-#### a.js
-```
-"require b";
-```
-
-Will make b.js to be included before a.js.
-
-## Options
+## Usage
 
 ```
-  -i, --input <dir|file>        	Specify an input folder. Order they are defined in also will change order they are included.
-  -I, --index <file>           		The path to output index file.
-  -w, --watch						Look after file changes in set input folders.
-  -c, --concat <file=./package.js>	Specify that files should be concatenated inside one file.
-  -u, --uglify						Specify that concatenated file should be minified. Setting this will force --concat flag to true.
-  -t, --timestamp					Add timestamp to scripts inside index file.
-  -h, --help 						Print help.
-  -v, --version						Current version number.
+Usage:
+        build-replica <file> [options]
+        build-replica <command>
+
+Options:
+        -i, index       Add output index file
+        -t, timestamp   Add timestamps to output files
+        -w, watch       Look after file changes in set input folders
+        -u, uglify      Specify that concatenated file should be minified, activates --concat
+        -c, concat      Concat all files into one
+        -s, server      Launch development server, activates --watch
+        -b, build       Specify build directory
+
+Commands:
+        make <dir>      Create and prepare an empty project
+        v               Prints current version
 ```
 
 ## TODO
 
-- Add optional package syntax
-- Custom input packages
+- JSON import
+- CSS import
 - Download url dependencies inside cache
 - Documentation generation
-- Support ECMA6 import syntax
+- Support for small configuration files for attacing custom build tools
+- To native & webasm compilation
 
 ## License
 
 MIT License
 
-Copyright (c) 2016 Arturs Šefers
+Copyright (c) 2017 Arturs Šefers
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

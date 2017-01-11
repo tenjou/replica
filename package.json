@@ -1,20 +1,16 @@
 {
   "name": "build-replica",
-  "version": "0.1.37",
-  "description": "Plug & play building tool for JavaScript.",
+  "version": "0.2.4",
+  "description": "Fast ECMA6 JavaScript build tool that is usable through CLI, seamless incremental compilation and developmen server with hot reload for rapid development.",
   "author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
   "main": "src/replica.js",
   "dependencies": {
-    "uglify-js": "git://github.com/mishoo/UglifyJS2.git#harmony"
+    "uglify-js": "git://github.com/mishoo/UglifyJS2.git#harmony",
+    "ws": "^1.1.1"
   },
   "repository": {
     "type": "git",
     "url": "https://github.com/tenjou/replica"
-  },
-  "scripts": {
-    "build": "npm run build:default & npm run build:uglify",
-    "build:default": "build-replica --input src --concat build/meta2d.js",
-    "build:uglify": "build-replica --input src --concat build/meta2d.min.js --uglify"
   },
   "bin": {
     "build-replica": "./bin/replica"
@@ -27,8 +23,5 @@
     "index"
   ],
   "preferGlobal": true,
-  "license": "MIT",
-  "devDependencies": {
-    "babel-preset-es2015": "^6.18.0"
-  }
+  "license": "MIT"
 }

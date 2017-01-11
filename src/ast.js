@@ -1,4 +1,10 @@
 
+// const Flag = {
+// 	UNKNOWN: 0 << 1,
+// 	EXPORTED: 1 << 1,
+// 	DEFAULT: 2 << 1
+// };
+
 class Identifier
 {
 	constructor(value) {
@@ -12,6 +18,8 @@ class Number
 	constructor(value) {
 		this.type = "Number";
 		this.value = value;
+		this.start = 0;
+		this.end = 0;		
 	}
 }
 
@@ -20,14 +28,19 @@ class Bool
 	constructor(value) {
 		this.type = "Bool";
 		this.value = value;
+		this.start = 0;
+		this.end = 0;
 	}
 }
 
 class String
 {
-	constructor(value) {
+	constructor(value, raw) {
 		this.type = "String";
 		this.value = value;
+		this.raw = raw;
+		this.start = 0;
+		this.end = 0;
 	}
 }
 
@@ -47,7 +60,7 @@ class Variable
 		this.type = "Variable";
 		this.value = value;
 		this.expr = expr;
-		this.kind = kind;
+		this.kind = kind || null;
 	}
 }
 
@@ -57,14 +70,13 @@ class VariableDeclaration
 		this.type = "VariableDeclaration";
 		this.decls = decls;
 		this.kind = kind;
-		this.exported = false;
 	}
 }
 
 class Array
 {
 	constructor(value) {
-		this.type = "array";
+		this.type = "Array";
 		this.value = value;
 	}
 }
@@ -72,17 +84,18 @@ class Array
 class Object
 {
 	constructor(value) {
-		this.type = "object";
+		this.type = "Object";
 		this.value = value;
 	}
 }
 
 class ObjectMember
 {
-	constructor(key, value) {
-		this.type = "objectMember";
+	constructor(key, value, kind) {
+		this.type = "ObjectMember";
 		this.key = key;
 		this.value = value;
+		this.kind = kind || null;
 	}
 }
 
@@ -128,6 +141,8 @@ class Null
 {
 	constructor() {
 		this.type = "Null";
+		this.start = 0;
+		this.end = 0;		
 	}
 }
 
@@ -138,7 +153,6 @@ class Function
 		this.id = id;
 		this.params = params;
 		this.body = body;
-		this.exported = false;
 	}
 }
 
@@ -149,7 +163,6 @@ class Class
 		this.id = id;
 		this.superCls = superCls; 
 		this.body = body;
-		this.exported = false;
 	}
 }
 
@@ -172,10 +185,21 @@ class MethodDef
 	}
 }
 
-class This
+class ThisExpression
 {
 	constructor() {
-		this.type = "This";
+		this.type = "ThisExpression";
+		this.start = 0;
+		this.end = 0;		
+	}
+}
+
+class Super
+{
+	constructor() {
+		this.type = "Super";
+		this.start = 0;
+		this.end = 0;
 	}
 }
 
@@ -322,6 +346,14 @@ class Try
 	}
 }
 
+class Throw 
+{
+	constructor(arg) {
+		this.type = "Throw";
+		this.arg = arg;
+	}
+}
+
 class Catch
 {
 	constructor(param, body) {
@@ -359,6 +391,65 @@ class Export
 	}
 }
 
+class ExportDefaultDeclaration
+{
+	constructor(decl) {
+		this.type = "ExportDefaultDeclaration";
+		this.decl = decl;
+	}
+}
+
+class LogicalExpression 
+{
+	constructor(left, right, op)
+	{
+		this.type = "LogicalExpression";
+		this.left = left;
+		this.right = right;
+		this.op = op;
+	}
+}
+
+class ArrowFunctionExpression 
+{
+	constructor(params, expression, generator, body)
+	{
+		this.type = "ArrowFunctionExpression";
+		this.params = params;
+		this.expression = expression;
+		this.generator = generator;
+		this.body = body;
+	}
+}
+
+class TemplateLiteral 
+{
+	constructor(expressions, quasis)
+	{
+		this.type = "TemplateLiteral";
+		this.expressions = expressions;
+		this.quasis = quasis;
+	}
+}
+
+class EmptyStatement
+{
+	constructor() 
+	{
+		this.type = "EmptyStatement";
+	}
+}
+
+class ExportSpecifier
+{
+	constructor(local, exported)
+	{
+		this.type = "ExportSpecifier";
+		this.local = local;
+		this.exported = exported;
+	}
+}
+
 module.exports = {
 	Identifier,
 	Number,
@@ -379,7 +470,8 @@ module.exports = {
 	Class,
 	ClassBody,
 	MethodDef,
-	This,
+	ThisExpression,
+	Super,
 	Block,
 	Return,
 	If,
@@ -396,8 +488,15 @@ module.exports = {
 	Label,
 	Sequence,
 	Try,
+	Throw,
 	Catch,
 	Import,
 	ImportSpecifier,
-	Export
+	Export,
+	LogicalExpression,
+	ArrowFunctionExpression,
+	TemplateLiteral,
+	EmptyStatement,
+	ExportSpecifier,
+	ExportDefaultDeclaration
 };
