@@ -34,6 +34,14 @@ build-replica src/main.js -i index.html -s -t
 build-replica src/main.js -i index.html -u -t
 ```
 
+## Templates
+For a new projects there is an option for creating boilerplate web application:
+```
+build-replica make <dir>
+cd <dir>
+npm run dev
+```
+
 ## Usage
 
 ```
