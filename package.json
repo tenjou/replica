@@ -1,9 +1,13 @@
 {
   "name": "build-replica",
-  "version": "0.2.6",
+  "version": "0.2.7",
   "description": "Fast ECMA6 JavaScript build tool that is usable through CLI, seamless incremental compilation and developmen server with hot reload for rapid development.",
   "author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
   "main": "src/replica.js",
+  "engines": { 
+    "node": ">=6.1.0"
+  },
+  "engineStrict": true,
   "dependencies": {
     "uglify-js": "git://github.com/mishoo/UglifyJS2.git#harmony",
     "ws": "^1.1.1"

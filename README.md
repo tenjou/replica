@@ -18,6 +18,8 @@ Replica by default only compiles and replaces files that are changed without nee
 
 ## Installation
 
+This package requires NodeJS v6.1.0 to be installed.
+
 ```
 npm install -g build-replica
 ```

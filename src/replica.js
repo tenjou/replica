@@ -34,6 +34,15 @@ function setBuildDir(dir) {
 	buildSrc = dir;
 }
 
+function addLibrary(dir, name)
+{
+	if(!name) {
+		name = path.basename(dir);
+	}
+
+	lexer.addLibrary(name, dir);
+}
+
 class IndexFile
 {
 	constructor(rootPath, filename, content) 
@@ -259,7 +268,6 @@ function updateTick()
 
 				utils.logYellow("Update", "IndexFile: " + key);
 				file.update();
-				
 			}
 			else
 			{
@@ -508,6 +516,7 @@ cli.name(package.name)
    .option("-c, --concat [file]", "Concat all files into one")
    .option("-s, --server [httpPort] [wsPort]", "Launch development server, activates --watch")
    .option("-b, --build <dir>", "Specify build directory", setBuildDir)
+   .option("-l, --library <dir> [name]", "Add custom library", addLibrary)
    .command("make <dir>", "Create and prepare an empty project", makeProject)
    .command("v", "\tPrints current version", printVersion)
    .parse(process.argv, run);

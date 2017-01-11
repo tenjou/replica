@@ -36,7 +36,7 @@ class WatchDirectory
             watchFile = new WatchFile(file);
             this.files[file.filename] = watchFile;
 
-            console.log("WATCH_FILE:", file.rootPath + file.filename);
+            // console.log("WATCH_FILE:", file.rootPath + file.filename);
         }
 
         watchFile.count++;
@@ -83,7 +83,7 @@ function watchFile(file)
         };
         handle.start(file.rootPath);
 
-        console.log("WATCH_DIR:", file.rootPath);
+        // console.log("WATCH_DIR:", file.rootPath);
     }
 
     dir.watchFile(file);

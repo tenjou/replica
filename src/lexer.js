@@ -582,26 +582,34 @@ function parse_ImportDeclaration(node)
 	let fullPath;
 	if(source.value[0] !== ".") 
 	{
-		const libraryPath = nodeModulesPath + source.value;
+		const customLibraryPath = library[source.value];
+
+		let libraryPath = customLibraryPath ? customLibraryPath : nodeModulesPath + source.value;
 		if(!fs.existsSync(libraryPath)) {
 			utils.logError("LibraryNotFound", source.value);
 			return;
 		}
 
-		const packagePath = libraryPath + "/package.json";
-		if(!fs.existsSync(packagePath)) {
-			utils.logError("PackageNotFound", source.value);
-			return;
-		}
+		if(fs.lstatSync(libraryPath).isDirectory())
+		{
+			const packagePath = libraryPath + "/package.json";
+			if(!fs.existsSync(packagePath)) {
+				utils.logError("PackageNotFound", source.value);
+				return;
+			}
 
-		const packageContent = JSON.parse(fs.readFileSync(packagePath, "utf8"));
-		const mainEntry = packageContent.main;
-		if(!mainEntry) {
-			utils.logError("PackageEntryNotFound", source.value);
-			return;
-		}
+			const packageContent = JSON.parse(fs.readFileSync(packagePath, "utf8"));
+			const mainEntry = packageContent.main;
+			if(!mainEntry) {
+				utils.logError("PackageEntryNotFound", source.value);
+				return;
+			}
 
-		fullPath = path.resolve(libraryPath, mainEntry);
+			fullPath = path.resolve(libraryPath, mainEntry);
+		}
+		else {
+			fullPath = customLibraryPath;
+		}
 	}
 	else
 	{

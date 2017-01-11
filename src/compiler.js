@@ -41,11 +41,10 @@ function compile(file, flags)
 
 		case "content":
 		{
-			const fileResult = compileContent(file);
-
-			// if(requirements.inherits) {
+			if(flags.needModule && context.flags.transpiling)
+			{
 				const requirementResult = `
-\nfunction _inherits(a, b)
+function _inherits(a, b)
 {
 	const protoA = a.prototype;
 	const proto = Object.create(b.prototype);
@@ -63,28 +62,23 @@ function compile(file, flags)
 
 	a.prototype = proto;
 	a.prototype.constructor = a;
-}\n`;
-				// const requirementResult = "function _inherits(a,b){var c=a.prototype,d=Object.create(b.prototype);d.name=b.name;a.prototype=d,a.prototype.constructor=b;for(var e in c){var f=Object.getOwnPropertyDescriptor(c,e);f.get||f.set?Object.defineProperty(d,e,f):d[e]=c[e]}}\n\n";
-			// }
+}\n\n`;
 
-			if(flags.needModule && context.flags.transpiling)
-			// if(context.flags.transpiling)
-			{
 				let result = `"use strict";\n\n`;
 				result += "window.module = { exports: {} };\n";
-				result += "window.exports = window.module.exports;\n\n";
+				result += "window.exports = window.module.exports;\n";
 				result += requirementResult;
-				result += fileResult;
+				result += compileContent(file, true);
 				return result;
 			}
 
-			let result = fileResult;
+			let result = compileContent(file, false);
 			return result;
 		}
 	}
 }
 
-function compileContent(file) 
+function compileContent(file, needModule) 
 {
 	let result = "";
 
@@ -114,7 +108,11 @@ function compileContent(file)
 	{
 		incTabs();
 
-		result += `"use strict";\n\n(function() `;
+		if(!needModule) {
+			result += `"use strict";\n\n`;
+		}
+		
+		result += "(function() ";
 		result += compile_Block(file.blockNode, compileSourceExports);
 		result += ")();"
 
