@@ -170,9 +170,11 @@ function parseOption(option, args, n)
 		if(n === args.length - 1) { break; }
 		
 		n++;
-		const optionArg = option.args[i];
 		const arg = args[n];
+		if(arg.indexOf("-") !== -1) { break; }
 
+		const optionArg = option.args[i];
+		
 		switch(optionArg.value)
 		{
 			case "file":
