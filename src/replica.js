@@ -95,7 +95,7 @@ class IndexFile
 					content += `<script src="${src}${file.filename}.${file.id}.js${timestamp}"></script>\n`;
 				}
 
-				if(file.blockNode) {
+				if(entrySourceFile.blockNode) {
 					timestamp = "?" + Date.now();
 					content += `<script src="${src}${entrySourceFile.filename}.${entrySourceFile.id}.js${timestamp}"></script>\n`;
 				}

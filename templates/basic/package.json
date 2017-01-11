@@ -5,8 +5,8 @@
 	"author": "",
 	"main": "src/main.js",
 	"scripts": {
-		"build": "build-replica src/main.js -i index.html -u -t",
-		"dev": "build-replica src/main.js -i index.html -s -t"
+		"build": "build-replica src/main.js -i index.html -t -u",
+		"dev": "build-replica src/main.js -i index.html -t -s"
 	},
 	"keywords": [],
 	"license": "MIT"
