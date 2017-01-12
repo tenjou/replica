@@ -6,7 +6,7 @@
 Replica is small and very fast ECMA6 JavaScript CLI build tool and supports most common actions you will find while developing JavaScript applications or libraries.
 
 #### Features
-* Supports ECMA6 transpiling and import syntax
+* Supports ECMA6 transpiling and import syntax (also supports importing text content)
 * Realtime watching for added/removed files
 * Development server with hot reload
 * Pack scripts into one file
