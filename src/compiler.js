@@ -20,30 +20,7 @@ const clsCtx = {
 	superCls: null
 };
 
-function compile(file, flags)
-{
-	if(!flags) 
-	{
-		flags = {
-			type: "content"
-		}	
-	}
-
-	context.flags = flags;
-	context.compileIndex++;
-
-	let requirementResult = "";
-
-	switch(flags.type)
-	{
-		case "imports":
-			return compileImports(file);
-
-		case "content":
-		{
-			if(flags.needModule && context.flags.transpiling)
-			{
-				const requirementResult = `
+const requirementResult = `
 function _inherits(a, b)
 {
 	const protoA = a.prototype;
@@ -64,18 +41,42 @@ function _inherits(a, b)
 	a.prototype.constructor = a;
 }\n\n`;
 
-				let result = `"use strict";\n\n`;
-				result += "window.module = { exports: {} };\n";
-				result += "window.exports = window.module.exports;\n";
-				result += requirementResult;
-				result += compileContent(file, true);
-				return result;
-			}
-
-			let result = compileContent(file, false);
-			return result;
-		}
+function compile(file, flags)
+{
+	if(!flags) 
+	{
+		flags = {
+			type: "content"
+		}	
 	}
+
+	context.flags = flags;
+	context.compileIndex++;
+
+	switch(flags.type)
+	{
+		case "imports":
+			return compileImports(file);
+
+		case "content":
+			return compileFile(file);
+	}
+}
+
+function compileFile(file)
+{
+	if(context.flags.needModule && context.flags.transpiling)
+	{
+		let result = `"use strict";\n\n`;
+		result += "window.module = { exports: {} };\n";
+		result += "window.exports = window.module.exports;\n";
+		result += requirementResult;
+		result += compileContent(file, true);
+		return result;
+	}
+
+	let result = compileContent(file, false);
+	return result;	
 }
 
 function compileContent(file, needModule) 
@@ -1091,6 +1092,9 @@ function compile_ExportDefaultDeclaration(node)
 	}
 	else if(decl instanceof AST.Class) {
 		result = doCompileLookup(decl) + tabs + result + doCompileLookup(decl.id);
+	}
+	else if(decl instanceof AST.String) {
+		result += "\"" + compile_String(decl) + "\"";
 	}
 	else {
 		result += doCompileLookup(decl);

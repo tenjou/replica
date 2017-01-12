@@ -323,7 +323,7 @@ function makeProject(dir)
 
 	copyFiles(dir, templatePath, () => 
 	{
-		console.log("Installing dependencies:\n");
+		console.log("Installing dependencies...\n");
 		exec(`cd ${dir} && npm i`, (error, stdout, stderr) => {
 			if(error) {
 				console.error(error);
@@ -347,7 +347,7 @@ function resolveBuildDir()
 	removeDir(buildSrc);
 	createRelativeDir(buildSrc);
 
-	copyFiles(buildSrc, path.normalize(__dirname + "/../templates/server"));
+	copyFiles(buildSrc, path.normalize(__dirname + "/../templates/server"), null, true);
 }
 
 function resolveOutputDir()
@@ -412,7 +412,7 @@ function removeDir(folderPath)
 	fs.rmdirSync(folderPath);
 }
 
-function copyFiles(targetDir, srcDir, onDone)
+function copyFiles(targetDir, srcDir, onDone, silent)
 {
 	const absoluteTargetDir = path.resolve(targetDir);
 	const absoluteSrcDir = path.resolve(srcDir);
@@ -436,7 +436,10 @@ function copyFiles(targetDir, srcDir, onDone)
 		}
 		else 
 		{
-			console.log(stdout);
+			if(!silent) {
+				console.log(stdout);
+			}
+			
 			if(onDone) {
 				onDone();
 			}

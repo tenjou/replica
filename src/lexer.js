@@ -29,6 +29,7 @@ class SourceFile
 		this.id = id;
 		this.rootPath = path.dirname(filePath) + slash;
 		this.filename = path.basename(filePath);
+		this.extname = path.extname(this.filename);
 		this.compileIndex = 0;
 		this.timestamp = Date.now();
 		this.blockNode = null;
@@ -57,25 +58,36 @@ class SourceFile
 			return;
 		}
 
-		const content = fs.readFileSync(filePath);
+		const content = fs.readFileSync(filePath, "utf8");
 
-		let node = null;
-		try {
-			node = acorn.parse(content, acornCfg);
+		switch(this.extname)
+		{
+			case ".js":
+			{
+				let node = null;
+				try {
+					node = acorn.parse(content, acornCfg);
+				}
+				catch(error) {
+					console.error(`ParseError: <${this.filename}>`, error);
+				}
+
+				const prevSourceFile = ctx.currSourceFile;
+				ctx.currSourceFile = this;
+				
+				this.clear();
+				this.blockNode = parse_BlockStatement(node);
+
+				ctx.currSourceFile = prevSourceFile;
+			} break;
+
+			default:
+				this.blockNode = parse_Text(content);
+				break;
 		}
-		catch(error) {
-			console.error(`ParseError: <${this.filename}>`, error);
-		}
-
-		const prevSourceFile = ctx.currSourceFile;
-		ctx.currSourceFile = this;
-		
-		this.clear();
-		this.blockNode = parse_BlockStatement(node);
-
-		ctx.currSourceFile = prevSourceFile;
 	}
 }
+
 
 function addLibrary(name, filePath) {
 	library[name] = filePath;
@@ -145,6 +157,18 @@ function getImports(sourceFile)
 
 function Scope() {
 	this.body = [];
+}
+
+function parse_Text(text)
+{
+	const textNode = new AST.String(null, text.replace(/(?:\r\n|\r|\n)/g, "\\n"));
+	const exportDefaultDecl = new AST.ExportDefaultDeclaration(textNode);
+
+	const scope = new Scope();
+	scope.body.push(exportDefaultDecl);
+
+	const block = new AST.Block(scope);
+	return block;
 }
 
 function parse_Identifier(node) {
@@ -614,7 +638,7 @@ function parse_ImportDeclaration(node)
 	else
 	{
 		fullPath = path.resolve(ctx.currSourceFile.rootPath, source.value);
-		if(path.extname(fullPath) !== ".js") {
+		if(path.extname(fullPath) === "") {
 			fullPath += ".js";
 		}
 	}
@@ -632,9 +656,9 @@ function parse_ImportSpecifiers(specifiers, map)
 
 	for(let n = 0; n < specifiers.length; n++)
 	{
-		let node = specifiers[n];
-		let imported = doLookup(node.imported);
-		let local = doLookup(node.local);
+		const node = specifiers[n];
+		const imported = doLookup(node.imported);
+		const local = doLookup(node.local);
 
 		if(!imported) {
 			map[local.value] = null;
