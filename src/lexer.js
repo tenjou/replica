@@ -81,6 +81,10 @@ class SourceFile
 				ctx.currSourceFile = prevSourceFile;
 			} break;
 
+			case ".json":
+				this.blockNode = parse_JSON(content);
+				break;
+
 			default:
 				this.blockNode = parse_Text(content);
 				break;
@@ -163,6 +167,29 @@ function parse_Text(text)
 {
 	const textNode = new AST.String(null, text.replace(/(?:\r\n|\r|\n)/g, "\\n"));
 	const exportDefaultDecl = new AST.ExportDefaultDeclaration(textNode);
+
+	const scope = new Scope();
+	scope.body.push(exportDefaultDecl);
+
+	const block = new AST.Block(scope);
+	return block;
+}
+
+function parse_JSON(text)
+{
+	text = text.replace(/\n/g, "")
+				.replace(/\t/g, "")
+				.replace(/\"/g, "\\\"");
+		
+	const textNode = new AST.String(null, text);
+
+	const parentNameNode = new AST.Identifier("JSON");
+	const funcNameNode = new AST.Identifier("parse");
+	const nameNode = new AST.Name(funcNameNode, parentNameNode);
+
+	const callNode = new AST.Call(nameNode, [ textNode ]);
+
+	const exportDefaultDecl = new AST.ExportDefaultDeclaration(callNode);
 
 	const scope = new Scope();
 	scope.body.push(exportDefaultDecl);

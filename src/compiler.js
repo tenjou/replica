@@ -238,7 +238,7 @@ function compile_Bool(node) {
 }
 
 function compile_String(node) {
-	return node.raw;
+	return `"${node.raw}"`;
 }
 
 function compile_New(node) 
@@ -1092,9 +1092,6 @@ function compile_ExportDefaultDeclaration(node)
 	}
 	else if(decl instanceof AST.Class) {
 		result = doCompileLookup(decl) + tabs + result + doCompileLookup(decl.id);
-	}
-	else if(decl instanceof AST.String) {
-		result += "\"" + compile_String(decl) + "\"";
 	}
 	else {
 		result += doCompileLookup(decl);
