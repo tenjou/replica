@@ -165,7 +165,7 @@ function Scope() {
 
 function parse_Text(text)
 {
-	text = "\"" + text.replace(/\n/g, "").replace(/\t/g, "").replace(/\"/g, "\\\"") + "\"";
+	text = "\"" + text.replace(/\n|\r\r|\r|\t/g, " ").replace(/\"/g, "\\\"") + "\"";
 
 	const textNode = new AST.String(null, text);
 	const exportDefaultDecl = new AST.ExportDefaultDeclaration(textNode);
@@ -179,7 +179,7 @@ function parse_Text(text)
 
 function parse_JSON(text)
 {
-	text = "\"" + text.replace(/\n/g, "").replace(/\t/g, "").replace(/\"/g, "\\\"") + "\"";
+	text = "\"" + text.replace(/\n|\r|\t/g, "").replace(/\"/g, "\\\"") + "\"";
 		
 	const textNode = new AST.String(null, text);
 
