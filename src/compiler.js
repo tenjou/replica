@@ -238,7 +238,7 @@ function compile_Bool(node) {
 }
 
 function compile_String(node) {
-	return `"${node.raw}"`;
+	return node.raw;
 }
 
 function compile_New(node) 
