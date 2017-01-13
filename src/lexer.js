@@ -99,12 +99,12 @@ function addLibrary(name, filePath) {
 
 function getSourceFile(filePath)
 {
-	let sourceFile = ctx.sourceFiles[filePath];
+	let sourceFile = ctx.sourceFiles[filePath.toLowerCase()];
 	if(!sourceFile)
 	{
 		sourceFile = new SourceFile(ctx.currSourceId++, filePath);
 		sourceFile.update();
-		ctx.sourceFiles[filePath] = sourceFile;
+		ctx.sourceFiles[filePath.toLowerCase()] = sourceFile;
 	}
 
 	return sourceFile;
