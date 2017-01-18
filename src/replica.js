@@ -474,7 +474,7 @@ function setEntry(src)
 function run(file) 
 {
 	setEntry(file);
-	
+
 	resolveBuildDir();
 	resolveOutputDir();
 
@@ -504,11 +504,13 @@ function start()
 			childProcess.spawn("explorer", [ serverAddress ]);
 		}
 
-		setInterval(() => {
+		setInterval(() => 
+		{
 			updateTick();
 		}, 100);
 	}
-	else {
+	else 
+	{
 		updateTick();
 	}	
 }

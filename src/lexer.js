@@ -37,10 +37,12 @@ class SourceFile
 		this.importsMap = {};
 		this.exports = [];
 		this.exportDefault = false;
+		this.updating = false;
 	}
 
 	clear()
 	{
+		this.updating = false;
 		this.exportDefault = false;
 		this.importsMap = {};
 		this.imports.length = 0;
@@ -57,6 +59,8 @@ class SourceFile
 			console.error("(SourceFile.update) No such file exists:", filePath);
 			return;
 		}
+
+		this.updating = true;
 
 		const content = fs.readFileSync(filePath, "utf8");
 
@@ -89,6 +93,8 @@ class SourceFile
 				this.blockNode = parse_Text(content);
 				break;
 		}
+
+		this.updating = false;
 	}
 }
 
@@ -103,8 +109,8 @@ function getSourceFile(filePath)
 	if(!sourceFile)
 	{
 		sourceFile = new SourceFile(ctx.currSourceId++, filePath);
-		sourceFile.update();
 		ctx.sourceFiles[filePath.toLowerCase()] = sourceFile;
+		sourceFile.update();
 	}
 
 	return sourceFile;
@@ -671,6 +677,10 @@ function parse_ImportDeclaration(node)
 	}
 
 	const sourceFile = getSourceFile(fullPath);
+	if(sourceFile.updating) {
+		throw `Circular import detected in:\n    "${ctx.currSourceFile.rootPath + ctx.currSourceFile.filename}"\n because of importing:\n    "${fullPath}"`;
+	}
+
 	const importDecl = new AST.Import(source, specifiersMap, imported, sourceFile);
 	ctx.currSourceFile.imports.push(sourceFile);
 

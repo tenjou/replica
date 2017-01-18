@@ -68,7 +68,6 @@ Commands:
 
 ## TODO
 
-- JSON import
 - CSS import
 - Download url dependencies inside cache
 - Documentation generation
