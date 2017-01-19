@@ -233,9 +233,9 @@ function uglifyContent(content)
 		result = uglifyJS.minify(content, { 
 			fromString: true,
 			compress: { 
-				dead_code: true,
+				dead_code: true
 			},
-			mangle: true 
+			mangle: false,			
 		});
 	}
 	catch(error)
