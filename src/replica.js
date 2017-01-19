@@ -134,7 +134,7 @@ class IndexFile
 		content += this.contentEnd;
 		this.updating = true;
 
-		fs.writeFile(this.rootPath + this.filename, content);
+		fs.writeFileSync(this.rootPath + this.filename, content, "utf8");
 	}
 
 	set content(content)
