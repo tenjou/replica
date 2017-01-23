@@ -39,7 +39,7 @@ build-replica src/main.js -i index.html -u -t
 ## Templates
 For a new projects there is an option for creating boilerplate web application:
 ```
-build-replica make <dir>
+build-replica make <dir> basic
 cd <dir>
 npm run dev
 ```

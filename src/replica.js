@@ -306,6 +306,8 @@ function updateTick()
 
 function makeProject(dir, template) 
 {
+	template = template || "basic";
+
 	const exists = fs.existsSync(dir);
 	if(exists) {
 		return utils.logError("Make", "Directory is not empty: " + dir);
