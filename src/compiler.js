@@ -440,6 +440,9 @@ function compile_Call_ecma5(node)
 		}
 		result += ")";
 	}
+	else if(node.value instanceof AST.Function) {
+		result = `(${value}) (${args})`;	
+	}
 	else {
 		result = value + "(" + args + ")";	
 	}
@@ -993,10 +996,27 @@ function compile_ThisExpression(node) {
 
 function compile_LogicalExpression(node)
 {
-	const left = doCompileLookup(node.left);
-	const right = doCompileLookup(node.right);
+	let left = doCompileLookup(node.left);
+	let right = doCompileLookup(node.right);
 
-	const result = `${left} ${node.op} ${right}`;
+	let result;
+
+	if(node.left instanceof AST.Binary) 
+	{
+		if(node.right instanceof AST.Binary) {
+			result = `(${left}) ${node.op} (${right})`;
+		}
+		else {
+			result = `(${left}) ${node.op} ${right}`;
+		}
+	}
+	else if(node.right instanceof AST.Binary) {
+		result = `${left} ${node.op} (${right})`;
+	}
+	else {
+		result = `${left} ${node.op} ${right}`;
+	}
+
 	return result;
 }
 
