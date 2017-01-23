@@ -1,17 +1,17 @@
 function logGreen(type, text) {
-	console.log(createTimestamp(), "\x1b[92m" + type, "\x1b[0m" + text);	
+	console.log(createTimestamp(), "\x1b[92m" + type, "\x1b[0m" + (text || ""));	
 }
 
 function logYellow(type, text) {
-	console.log(createTimestamp(), "\x1b[33m" + type, "\x1b[0m" + text);	
+	console.log(createTimestamp(), "\x1b[33m" + type, "\x1b[0m" + (text || ""));	
 }
 
 function logMagenta(type, text) {
-	console.log(createTimestamp(), "\x1b[35m" + type, "\x1b[0m" + text);	
+	console.log(createTimestamp(), "\x1b[35m" + type, "\x1b[0m" + (text || ""));	
 }
 
 function logError(type, text) {
-	console.log(createTimestamp(), "\x1b[91m" + type, "\x1b[0m"  + text);	
+	console.log(createTimestamp(), "\x1b[91m" + type, "\x1b[0m"  + (text || ""));	
 }
 
 function createTimestamp() 

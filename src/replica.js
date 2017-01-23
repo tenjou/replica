@@ -304,20 +304,18 @@ function updateTick()
 	}
 }
 
-function makeProject(dir) 
+function makeProject(dir, template) 
 {
 	const exists = fs.existsSync(dir);
-	if(exists) 
-	{
-		if(fs.lstatSync(dir).isDirectory()) {
-			return console.warn("Could not make project - directory already exists");
-		}
-		else {
-			return console.warn("Could not make project - there is a file with such name");
-		}
+	if(exists) {
+		return utils.logError("Make", "Directory is not empty: " + dir);
 	}
 
-	const templatePath = path.normalize(__dirname + "/../templates/basic");
+	const templatePath = path.normalize(`${__dirname}/../templates/${template}`);
+	const templateExists = fs.existsSync(templatePath);
+	if(!templateExists) {
+		return utils.logError("Make", "Requested template does not exists: " + template);
+	}
 
 	fs.mkdirSync(dir);
 
@@ -330,6 +328,7 @@ function makeProject(dir)
 			}
 			else {
 				console.log(stdout);
+				utils.logGreen("Ready");
 			}
 		});
 	});
@@ -347,7 +346,7 @@ function resolveBuildDir()
 	removeDir(buildSrc);
 	createRelativeDir(buildSrc);
 
-	copyFiles(buildSrc, path.normalize(__dirname + "/../templates/server"), null, true);
+	copyFiles(buildSrc, path.normalize(__dirname + "/../lib/server"), null, true);
 }
 
 function resolveOutputDir()
@@ -528,7 +527,7 @@ cli.name(package.name)
    .option("-s, --server [httpPort] [wsPort]", "Launch development server, activates --watch")
    .option("-b, --build <dir>", "Specify build directory", setBuildDir)
    .option("-l, --library <dir> [name]", "Add custom library", addLibrary)
-   .command("make <dir>", "Create and prepare an empty project", makeProject)
+   .command("make <dir> [template]", "Create and prepare an empty project", makeProject)
    .command("v", "\tPrints current version", printVersion)
    .parse(process.argv, run);
 

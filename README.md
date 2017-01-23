@@ -48,22 +48,29 @@ npm run dev
 
 ```
 Usage:
-        build-replica <file> [options]
-        build-replica <command>
+	build-replica <file> [options]
+	build-replica <command>
 
 Options:
-        -i, index       Add output index file
-        -t, timestamp   Add timestamps to output files
-        -w, watch       Look after file changes in set input folders
-        -u, uglify      Specify that concatenated file should be minified, activates --concat
-        -c, concat      Concat all files into one
-        -s, server      Launch development server, activates --watch
-        -b, build       Specify build directory
-        -l, library     Add custom library
+	-i, index       	Add output index file
+	-t, timestamp   	Add timestamps to output files
+	-w, watch       	Look after file changes in set input folders
+	-u, uglify      	Specify that concatenated file should be minified, activates --concat
+	-c, concat      	Concat all files into one
+	-s, server      	Launch development server, activates --watch
+	-b, build       	Specify build directory
+	-l, library     	Add custom library
 
 Commands:
-        make <dir>      Create and prepare an empty project
-        v               Prints current version
+	make <dir> [template] 	Create and prepare an empty project
+	v          		Prints current version
+```
+
+## Templates
+
+```
+basic - Basic web HTML5 application.
+server - Basic NodeJS server application.
 ```
 
 ## TODO

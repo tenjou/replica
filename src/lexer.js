@@ -18,7 +18,8 @@ const acornCfg = {
 	sourceType: "module"
 };
 
-const library = {};
+const customModules = {};
+const modules = {};
 
 class SourceFile
 {
@@ -96,11 +97,15 @@ class SourceFile
 
 		this.updating = false;
 	}
+
+	get fullPath() {
+		return this.rootPath + this.filename;
+	}
 }
 
 
 function addLibrary(name, filePath) {
-	library[name] = filePath;
+	customModules[name] = filePath;
 }
 
 function getSourceFile(filePath)
@@ -133,7 +138,8 @@ function compile(sourceFile, needModule)
 	const result = compiler.compile(sourceFile, {
 		type: "content",
 		transpiling: true,
-		needModule: needModule
+		needModule: needModule,
+		modules
 	});
 	return result;
 }
@@ -144,7 +150,8 @@ function compileAll(sourceFile)
 		type: "content",
 		concat: true,
 		transpiling: true,
-		needModule: true
+		needModule: true,
+		modules
 	});
 
 	return result;
@@ -159,7 +166,8 @@ function getImports(sourceFile)
 
 	const imports = compiler.compile(sourceFile, {
 		type: "imports",
-		transpiling: true
+		transpiling: true,
+		modules
 	});
 
 	return imports;
@@ -636,41 +644,58 @@ function parse_ImportDeclaration(node)
 		importsMap[key] = true;
 	}
 
-	let fullPath;
-	if(source.value[0] !== ".") 
-	{
-		const customLibraryPath = library[source.value];
+	const moduleName = source.value;
 
-		let libraryPath = customLibraryPath ? customLibraryPath : nodeModulesPath + source.value;
-		if(!fs.existsSync(libraryPath)) {
-			utils.logError("LibraryNotFound", source.value);
+	let fullPath;
+	if(moduleName[0] !== ".") 
+	{
+		let modulePath;
+		let custom;
+
+		const customModulePath = customModules[moduleName];
+		if(customModulePath) {
+			modulePath = customModulePath;
+			custom = true;
+		}
+		else {
+			modulePath = nodeModulesPath + moduleName;
+			custom = false;
+		}
+
+		if(!fs.existsSync(modulePath)) {
+			utils.logError("ModuleNotFound", moduleName);
 			return;
 		}
 
-		if(fs.lstatSync(libraryPath).isDirectory())
+		if(fs.lstatSync(modulePath).isDirectory())
 		{
-			const packagePath = libraryPath + "/package.json";
+			const packagePath = modulePath + "/package.json";
 			if(!fs.existsSync(packagePath)) {
-				utils.logError("PackageNotFound", source.value);
+				utils.logError("PackageNotFound", moduleName);
 				return;
 			}
 
 			const packageContent = JSON.parse(fs.readFileSync(packagePath, "utf8"));
 			const mainEntry = packageContent.main;
 			if(!mainEntry) {
-				utils.logError("PackageEntryNotFound", source.value);
+				utils.logError("PackageEntryNotFound", moduleName);
 				return;
 			}
 
-			fullPath = path.resolve(libraryPath, mainEntry);
+			fullPath = path.resolve(modulePath, mainEntry);
 		}
 		else {
 			fullPath = customLibraryPath;
 		}
+
+		modules[moduleName] = {
+			path: fullPath,
+			custom
+		}
 	}
 	else
 	{
-		fullPath = path.resolve(ctx.currSourceFile.rootPath, source.value);
+		fullPath = path.resolve(ctx.currSourceFile.rootPath, moduleName);
 		if(path.extname(fullPath) === "") {
 			fullPath += ".js";
 		}

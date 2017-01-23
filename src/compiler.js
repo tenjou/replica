@@ -1,4 +1,5 @@
 const AST = require("./ast.js");
+const path = require("path");
 
 let tabs = "";
 let numTabs = 0;
@@ -20,26 +21,129 @@ const clsCtx = {
 	superCls: null
 };
 
-const requirementResult = `
-function _inherits(a, b)
+function genRequirementResult(modulesPath) 
 {
-	const protoA = a.prototype;
-	const proto = Object.create(b.prototype);
-
-	for(const key in protoA) 
+	return `(function(scope) {
+	scope.module = { exports: {} };
+	scope.modules = {};
+	scope.modulesCached = {};
+	scope.modulesPath = ${modulesPath};
+	
+	if(typeof require === "undefined") 
 	{
-		const param = Object.getOwnPropertyDescriptor(protoA, key);
-		if(param.get || param.set) { 
-			Object.defineProperty(proto, key, param);
-		}
-		else {
-			proto[key] = protoA[key];
-		}
+		window.require = function require(path) 
+		{	
+			var cwdBuffer = require.cwd;
+
+			if(path[0] === ".") 
+			{
+				var cwd = (cwdBuffer.length > 0) ? cwdBuffer[cwdBuffer.length - 1].slice() : [ "." ];
+
+				var pathBuffer = path.split("/");
+				for(var n = 0; n < pathBuffer.length - 1; n++) {
+					var item = pathBuffer[n];
+					if(item === ".") { continue;}
+					if(item === "..") 
+					{
+						if(cwd.length === 0) {
+							cwd.push(item);
+						}
+						else {
+							cwd.pop();
+						}
+					}
+					else {
+						cwd.push(item);
+					}
+				}
+
+				var filename = pathBuffer.pop();
+				var index = filename.lastIndexOf(".");
+				if(index === -1) {
+					filename += ".js";
+				}
+
+				var importPath = cwd.join("/") + "/" + filename;
+
+				var content = modulesCached[importPath];
+				if(!content) 
+				{
+					window.module = { exports: {} };
+
+					cwdBuffer.push(cwd);
+					modules[importPath]();
+					modulesCached[importPath] = module.exports;
+					content = module.exports;
+					cwdBuffer.pop();
+				}
+
+				return content;
+			}
+
+			var modulePath = modulesPath[path];
+			var content = modulesCached[modulePath];
+			if(!content) 
+			{
+				window.module = { exports: {} };
+
+				var modulePathBuffer = modulePath.split("/");
+				modulePathBuffer.pop();
+
+				cwdBuffer.push(modulePathBuffer);
+				modules[modulePath]();
+				modulesCached[modulePath] = module.exports;
+				content = module.exports;
+				cwdBuffer.pop();
+			}
+
+			return content;
+		};
+
+		window.require.cwd = [];
 	}
 
-	a.prototype = proto;
-	a.prototype.constructor = a;
-}\n\n`;
+	scope._inherits = function(a, b)
+	{
+		const protoA = a.prototype;
+		const proto = Object.create(b.prototype);
+
+		for(const key in protoA) 
+		{
+			const param = Object.getOwnPropertyDescriptor(protoA, key);
+			if(param.get || param.set) { 
+				Object.defineProperty(proto, key, param);
+			}
+			else {
+				proto[key] = protoA[key];
+			}
+		}
+
+		a.prototype = proto;
+		a.prototype.constructor = a;
+	}
+})(window || global);\n\n`;
+}
+
+function genModulePaths()
+{
+	let result = "";
+
+	const modules = context.flags.modules;
+	for(const key in modules)
+	{
+		const module = modules[key];
+
+		let modulePath = path.relative(process.cwd(), module.path).replace(/\\/g,"/");
+		if(modulePath[0] !== ".") {
+			modulePath = "./" + modulePath;
+		}
+		modulePath = modulePath.toLowerCase();
+
+		result += ` "${key}":"${modulePath}",`;
+	}
+
+	return `{${result} }`;
+}
 
 function compile(file, flags)
 {
@@ -68,8 +172,7 @@ function compileFile(file)
 	if(context.flags.needModule && context.flags.transpiling)
 	{
 		let result = `"use strict";\n\n`;
-		result += "window.modules = { exports: {} };\n";
-		result += requirementResult;
+		result += genRequirementResult(genModulePaths());
 		result += compileContent(file, true);
 		return result;
 	}
@@ -111,10 +214,15 @@ function compileContent(file, needModule)
 		if(!needModule) {
 			result += `"use strict";\n\n`;
 		}
+
+		let relativePath = path.relative(process.cwd(), file.fullPath).replace(/\\/g,"/");
+		if(relativePath[0] !== ".") {
+			relativePath = "./" + relativePath;
+		}
+		relativePath = relativePath.toLowerCase();
 		
-		result += "(function() ";
+		result += `modules["${relativePath}"] = function() `;
 		result += compile_Block(file.blockNode, compileSourceExports);
-		result += ")();"
 
 		decTabs();
 	}
@@ -159,7 +267,7 @@ function compileSourceExports()
 	const sourceExports = context.currSourceFile.exports;
 	if(sourceExports.length === 0) { return ""; }
 
-	let result = `modules[${context.currSourceFile.id}] = `;
+	let result = "module.exports = ";
 
 	if(context.currSourceFile.exportDefault) 
 	{
@@ -184,7 +292,13 @@ function compileSourceExports()
 			result += ", " + getNameFromNode(node);
 		}
 
-		result += " };";
+		let relativePath = path.relative(process.cwd(), context.currSourceFile.fullPath).replace(/\\/g,"/");
+		if(relativePath[0] !== ".") {
+			relativePath = "./" + relativePath;
+		}
+		relativePath = relativePath.toLowerCase();
+
+		result += " };\n";
 	}
 	
 	return result;
@@ -787,33 +901,49 @@ function compile_Import(node)
 {
 	const specifiers = node.specifiers;
 
+	let value = node.source.value;
+	if(value[0] === ".") 
+	{
+		if(!path.extname(value)) {
+			value += ".js";
+		}
+	}
+	value = value.toLowerCase();
+
 	let result = "";
 
 	if(context.flags.transpiling)
 	{
 		let added = false;
+		let specifierAdded = false;
 
 		for(let key in specifiers)
 		{
+			specifierAdded = true;
+
 			if(node.imported) {
-				result += `const ${key} = modules[${node.sourceFile.id}]`;
+				result += `const ${key} = require("${value}")`;
 			}
 			else 
 			{
 				if(!added) {
 					added = true;
-					result += `const ${specifiers[key]} = modules[${node.sourceFile.id}].${key}`;
+					result += `const ${specifiers[key]} = require("${value}").${key}`;
 				}
 				else {
-					result += `;\n${tabs}const ${specifiers[key]} = modules[${node.sourceFile.id}].${key}`;
+					result += `;\n${tabs}const ${specifiers[key]} = require("${value}").${key}`;
 				}
 			}
+		}
+
+		if(!specifierAdded) {
+			result += `require("${value}")`;
 		}
 	}
 	else
 	{
 		result += "import " +
-			compile_ImportSpecifiers(node.specifiers) + 
+			compile_ImportSpecifiers(specifiers) + 
 			" from " + 
 			doCompileLookup(node.source);
 	}
@@ -1104,7 +1234,7 @@ function compile_ExportDefaultDeclaration(node)
 {
 	const decl = node.decl;
 
-	let result = `modules[${context.currSourceFile.id}] = `;
+	let result = "module.exports = ";
 	
 	if(decl instanceof AST.Binary) {
 		 result += doCompileLookup(decl.right);

@@ -1,0 +1,13 @@
+{
+	"name": "untitled",
+	"version": "0.1.0",
+	"description": "",
+	"author": "",
+	"main": "src/main.js",
+	"scripts": {
+		"build": "build-replica src/main.js -u",
+		"dev": "build-replica src/main.js -w"
+	},
+	"keywords": [],
+	"license": "MIT"
+}

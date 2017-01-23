@@ -264,14 +264,14 @@ function help()
 	console.log("Options:");
 	for(const key in ctx.options) {
 		const option = ctx.options[key];
-		console.log(`\t-${option.shortName}, ${option.name}\t${option.description}`);
+		console.log(`\t-${option.shortName}, ${option.name}\t\t${option.description}`);
 	}
 
 	console.log("");
 	console.log("Commands:");
 	for(const key in ctx.commands) {
 		const cmd = ctx.commands[key];
-		console.log(`\t${cmd.argStr}\t${cmd.description}`);
+		console.log(`\t${cmd.argStr}\t\t${cmd.description}`);
 	}
 }
 
