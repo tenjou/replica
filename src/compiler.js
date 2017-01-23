@@ -68,8 +68,7 @@ function compileFile(file)
 	if(context.flags.needModule && context.flags.transpiling)
 	{
 		let result = `"use strict";\n\n`;
-		result += "window.module = { exports: {} };\n";
-		result += "window.exports = window.module.exports;\n";
+		result += "window.modules = { exports: {} };\n";
 		result += requirementResult;
 		result += compileContent(file, true);
 		return result;
@@ -160,7 +159,7 @@ function compileSourceExports()
 	const sourceExports = context.currSourceFile.exports;
 	if(sourceExports.length === 0) { return ""; }
 
-	let result = `exports[${context.currSourceFile.id}] = `;
+	let result = `modules[${context.currSourceFile.id}] = `;
 
 	if(context.currSourceFile.exportDefault) 
 	{
@@ -797,16 +796,16 @@ function compile_Import(node)
 		for(let key in specifiers)
 		{
 			if(node.imported) {
-				result += `const ${key} = exports[${node.sourceFile.id}]`;
+				result += `const ${key} = modules[${node.sourceFile.id}]`;
 			}
 			else 
 			{
 				if(!added) {
 					added = true;
-					result += `const ${specifiers[key]} = exports[${node.sourceFile.id}].${key}`;
+					result += `const ${specifiers[key]} = modules[${node.sourceFile.id}].${key}`;
 				}
 				else {
-					result += `;\n${tabs}const ${specifiers[key]} = exports[${node.sourceFile.id}].${key}`;
+					result += `;\n${tabs}const ${specifiers[key]} = modules[${node.sourceFile.id}].${key}`;
 				}
 			}
 		}
@@ -1105,7 +1104,7 @@ function compile_ExportDefaultDeclaration(node)
 {
 	const decl = node.decl;
 
-	let result = `exports[${context.currSourceFile.id}] = `;
+	let result = `modules[${context.currSourceFile.id}] = `;
 	
 	if(decl instanceof AST.Binary) {
 		 result += doCompileLookup(decl.right);
