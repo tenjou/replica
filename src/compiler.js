@@ -789,16 +789,27 @@ function compile_SwitchCase(node)
 
 	incTabs();
 
+	let prevNode = null;
 	const buffer = node.scope.body;
 	for(let n = 0; n < buffer.length; n++) 
 	{
 		let bufferNode = buffer[n];
-		if(bufferNode.type === "Block") {
-			result += doCompileLookup(bufferNode);
+		if(bufferNode instanceof AST.Block) {
+			decTabs();
+			result += tabs + compile_Block(bufferNode);
+			incTabs();
 		}
-		else {
-			result += tabs + doCompileLookup(bufferNode) + ";\n";
+		else 
+		{
+			if(prevNode && prevNode instanceof AST.Block) {
+				result += " " + doCompileLookup(bufferNode) + ";\n";
+			}
+			else {
+				result += tabs + doCompileLookup(bufferNode) + ";\n";
+			}
 		}
+
+		prevNode = bufferNode;
 	}
 
 	decTabs();
