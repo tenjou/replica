@@ -480,7 +480,7 @@ function compile_ObjectMember(node)
 			value = doCompileLookup(node.value);
 		}
 
-		result = node.kind + " " + key + " " + value;
+		result = node.kind + " " + key + value;
 	}
 	else 
 	{
