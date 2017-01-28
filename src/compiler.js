@@ -104,12 +104,12 @@ function genRequirementResult(modulesPath)
 
 	scope._inherits = function(a, b)
 	{
-		const protoA = a.prototype;
-		const proto = Object.create(b.prototype);
+		var protoA = a.prototype;
+		var proto = Object.create(b.prototype);
 
-		for(const key in protoA) 
+		for(var key in protoA) 
 		{
-			const param = Object.getOwnPropertyDescriptor(protoA, key);
+			var param = Object.getOwnPropertyDescriptor(protoA, key);
 			if(param.get || param.set) { 
 				Object.defineProperty(proto, key, param);
 			}
@@ -120,6 +120,12 @@ function genRequirementResult(modulesPath)
 
 		a.prototype = proto;
 		a.prototype.constructor = a;
+
+		if(b.__inherit === undefined) {
+			b.__inherit = {};
+		}
+
+		b.__inherit[a.name] = a;
 	}
 })(window || global);\n\n`;
 }
@@ -939,10 +945,10 @@ function compile_Import(node)
 			{
 				if(!added) {
 					added = true;
-					result += `const ${specifiers[key]} = require("${value}").${key}`;
+					result += `const ${key} = require("${value}").${specifiers[key]}`;
 				}
 				else {
-					result += `;\n${tabs}const ${specifiers[key]} = require("${value}").${key}`;
+					result += `;\n${tabs}const ${key} = require("${value}").${specifiers[key]}`;
 				}
 			}
 		}
