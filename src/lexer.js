@@ -738,8 +738,9 @@ function parse_ExportNamedDeclaration(node)
 {
 	const specifiers = node.specifiers;
 
+	let source = null;
 	if(node.source) {
-		parse_ImportDeclaration(node);
+		source = parse_ImportDeclaration(node);
 	}
 
 	if(specifiers.length > 0) 
@@ -749,7 +750,7 @@ function parse_ExportNamedDeclaration(node)
 			ctx.currSourceFile.exports.push(exportSpecifier);
 		}
 
-		return null;
+		return source;
 	}
 
 	const decl = doLookup(node.declaration);

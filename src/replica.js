@@ -518,6 +518,14 @@ function start()
 
 console.log();
 
+// console.log(process.argv);
+
+// process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
+//   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
+//   'src/main.js',
+//   '-i',
+//   'index.html' ];
+
 cli.name(package.name)
    .version(package.version)
    .description(package.description)

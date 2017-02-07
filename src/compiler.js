@@ -1,5 +1,6 @@
 const AST = require("./ast.js");
 const path = require("path");
+const StringUtils = require("./StringUtils");
 
 let tabs = "";
 let numTabs = 0;
@@ -28,6 +29,11 @@ function genRequirementResult(modulesPath)
 	scope.modules = {};
 	scope.modulesCached = {};
 	scope.modulesPath = ${modulesPath};
+	scope.process = {
+		env: {
+			NODE_ENV: "dev"
+		}
+	};
 	
 	if(typeof require === "undefined") 
 	{
@@ -304,7 +310,7 @@ function compileSourceExports()
 		}
 		relativePath = relativePath.toLowerCase();
 
-		result += " };\n";
+		result += " };";
 	}
 	
 	return result;
@@ -339,6 +345,9 @@ function getNameFromNode(node)
 	}
 	else if(node instanceof AST.Name) {
 		return compile_Name(node);
+	}
+	else if(node instanceof AST.Call) {
+		return doCompileLookup(node.value);
 	}
 
 	return null;
@@ -889,7 +898,7 @@ function compile_Sequence(node)
 	let exprNode = exprs[0];
 	let result = doCompileLookup(exprNode);
 	
-	for(let n = 0; n < exprs.length; n++) {
+	for(let n = 1; n < exprs.length; n++) {
 		exprNode = exprs[n];
 		result += ", " + doCompileLookup(exprNode);
 	}
@@ -917,6 +926,7 @@ function compile_Throw(node)
 function compile_Import(node) 
 {
 	const specifiers = node.specifiers;
+	const specifiersLength = Object.keys(specifiers).length;
 
 	let value = node.source.value;
 	if(value[0] === ".") 
@@ -931,30 +941,49 @@ function compile_Import(node)
 
 	if(context.flags.transpiling)
 	{
-		let added = false;
-		let specifierAdded = false;
-
-		for(let key in specifiers)
+		if(!node.imported)
 		{
-			specifierAdded = true;
-
-			if(node.imported) {
-				result += `const ${key} = require("${value}")`;
-			}
-			else 
+			if(specifiersLength === 1) 
 			{
-				if(!added) {
-					added = true;
-					result += `const ${key} = require("${value}").${specifiers[key]}`;
+				for(let key in specifiers) {
+					result = `const ${key} = require("${value}").${specifiers[key]};`;
 				}
-				else {
-					result += `;\n${tabs}const ${key} = require("${value}").${specifiers[key]}`;
+			}
+			else
+			{
+				const sourceValue = node.source.value;
+				const name = StringUtils.camelCase(path.basename(sourceValue));
+				const filename = `__${name}`;
+				result = `const ${filename} = require("${value}");`;
+
+				for(let key in specifiers) {
+					result += `\n${tabs}const ${key} = ${filename}.${specifiers[key]};`;
+				}
+			}
+		}
+		else
+		{
+			if(specifiersLength === 1) 
+			{
+				for(let key in specifiers) {
+					result = `const ${key} = require("${value}");`;
+				}
+			}
+			else
+			{
+				const sourceValue = node.source.value;
+				const name = StringUtils.camelCase(path.basename(sourceValue));
+				const filename = `__${name}`;
+				result = `const ${filename} = require("${value}");`;
+
+				for(let key in specifiers) {
+					result += `\n${tabs}const ${key} = ${filename}.${key}`;
 				}
 			}
 		}
 
-		if(!specifierAdded) {
-			result += `require("${value}")`;
+		if(!result) {
+			result = `require("${value}")`;
 		}
 	}
 	else
@@ -1210,7 +1239,7 @@ function compile_TemplateLiteral(node)
 	else
 	{
 		for(let n = 0; n < quasis.length - 1; n++) {
-			result += compile_Quasis(quasis[n]) + "\" + " + getNameFromNode(expressions[n]) + " + \""; 
+			result += compile_Quasis(quasis[n]) + "\" + " + doCompileLookup(expressions[n]) + " + \""; 
 		}
 
 		result += quasis[num].value;
