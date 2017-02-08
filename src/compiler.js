@@ -1,6 +1,6 @@
 const AST = require("./ast.js");
 const path = require("path");
-const StringUtils = require("./StringUtils");
+const utils = require("./utils");
 
 let tabs = "";
 let numTabs = 0;
@@ -956,7 +956,7 @@ function compile_Import(node)
 			else
 			{
 				const sourceValue = node.source.value;
-				const name = StringUtils.camelCase(path.basename(sourceValue));
+				const name = utils.camelCase(path.basename(sourceValue));
 				const filename = `__${name}`;
 				result = `const ${filename} = require("${value}")`;
 
@@ -976,7 +976,7 @@ function compile_Import(node)
 			else
 			{
 				const sourceValue = node.source.value;
-				const name = StringUtils.camelCase(path.basename(sourceValue));
+				const name = utils.camelCase(path.basename(sourceValue));
 				const filename = `__${name}`;
 				result = `const ${filename} = require("${value}")`;
 
