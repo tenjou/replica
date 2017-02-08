@@ -483,7 +483,11 @@ function compile_Object(node)
 
 function compile_ObjectMember(node)
 {
-	const key = doCompileLookup(node.key);
+	let key = doCompileLookup(node.key);
+
+	if(node.computed) {
+		key = `[${key}]`;
+	}
 
 	if(node.kind && node.kind !== "init") 
 	{

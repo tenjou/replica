@@ -281,16 +281,16 @@ function parse_ArrayExpression(node)
 	return arrayExpr;
 }
 
-function parse_ObjectExpression(node)
+const parse_ObjectExpression = (node) =>
 {
-	const props = node.properties;
-	const propsBuffer = new Array(props.length);
+	const props = node.properties
+	const propsBuffer = new Array(props.length)
 	for(let n = 0; n < props.length; n++) {
-		let propNode = props[n];
-		propsBuffer[n] = parse_ObjectMember(propNode);
+		let prop = props[n]
+		propsBuffer[n] = parse_Property(prop)
 	}
 
-	const objExpr = new AST.Object(propsBuffer);
+	const objExpr = new AST.Object(propsBuffer)
 	return objExpr;
 }
 
@@ -299,7 +299,7 @@ function parse_ObjectMember(node)
 	const key = doLookup(node.key);
 	const value = doLookup(node.value);
 
-	const objMemberExpr = new AST.ObjectMember(key, value, node.kind);
+	const objMemberExpr = new AST.ObjectMember(key, value, node.kind, node.computed);
 	return objMemberExpr;
 }
 
@@ -820,16 +820,14 @@ function parse_TemplateQuasis(quasis)
 	return result;
 }
 
-function parse_TemplateElement(node)
-{
+const parse_TemplateElement = (node) => {
 	const templateElement = new AST.String(node.value.cooked, node.value.raw);
-	return templateElement;
+	return templateElement
 }
 
-function parse_EmptyStatement(node) 
-{
+const parse_EmptyStatement = (node) => {
 	const emptyStatement = new AST.EmptyStatement();
-	return emptyStatement;
+	return emptyStatement
 }
 
 const parse_ObjectPattern = (node) => {
@@ -850,7 +848,7 @@ const parse_Properties = (buffer) => {
 const parse_Property = (node) => {
 	const key = doLookup(node.key)
 	const value = doLookup(node.value)
-	const property = new AST.Property(key, value)
+	const property = new AST.Property(key, value, node.kind, node.computed)
 	return property
 }
 

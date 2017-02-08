@@ -89,16 +89,6 @@ class Object
 	}
 }
 
-class ObjectMember
-{
-	constructor(key, value, kind) {
-		this.type = "ObjectMember";
-		this.key = key;
-		this.value = value;
-		this.kind = kind || null;
-	}
-}
-
 class Call
 {
 	constructor(value, args) {
@@ -452,16 +442,18 @@ class ExportSpecifier
 
 class Property
 {
-	constructor(key, value) {
-		this.key = key;
-		this.value = value;
+	constructor(key, value, kind, computed) {
+		this.key = key
+		this.value = value
+		this.kind = kind
+		this.computed = computed
 	}
 }
 
 class ObjectPattern
 {
 	constructor(properties) {
-		this.properties = properties;
+		this.properties = properties
 	}
 }
 
@@ -475,7 +467,6 @@ module.exports = {
 	VariableDeclaration,
 	Array,
 	Object,
-	ObjectMember,
 	Call,
 	Binary,
 	Update,
