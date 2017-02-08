@@ -832,8 +832,30 @@ function parse_EmptyStatement(node)
 	return emptyStatement;
 }
 
+const parse_ObjectPattern = (node) => {
+	const properties = parse_Properties(node.properties)
+	const objectPattern = new AST.ObjectPattern(properties)
+	return objectPattern
+}
+
+const parse_Properties = (buffer) => {
+	const result = new Array(buffer.length)
+	for(let n = 0; n < buffer.length; n++) {
+		const prop = doLookup(buffer[n])
+		result[n] = prop
+	}
+	return result
+}
+
+const parse_Property = (node) => {
+	const key = doLookup(node.key)
+	const value = doLookup(node.value)
+	const property = new AST.Property(key, value)
+	return property
+}
+
 function doLookup(node) {
-	return node ? lookup[node.type](node) : null;
+	return node ? lookup[node.type](node) : null
 }
 
 const lookup = {
@@ -882,7 +904,9 @@ const lookup = {
 	Super: parse_Super,
 	TemplateLiteral: parse_TemplateLiteral,
 	EmptyStatement: parse_EmptyStatement,
-	ExportDefaultDeclaration: parse_ExportDefaultDeclaration
+	ExportDefaultDeclaration: parse_ExportDefaultDeclaration,
+	ObjectPattern: parse_ObjectPattern,
+	Property: parse_Property
 };
 
 module.exports = {

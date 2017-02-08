@@ -946,7 +946,7 @@ function compile_Import(node)
 			if(specifiersLength === 1) 
 			{
 				for(let key in specifiers) {
-					result = `const ${key} = require("${value}").${specifiers[key]};`;
+					result = `const ${key} = require("${value}").${specifiers[key]}`;
 				}
 			}
 			else
@@ -954,10 +954,10 @@ function compile_Import(node)
 				const sourceValue = node.source.value;
 				const name = StringUtils.camelCase(path.basename(sourceValue));
 				const filename = `__${name}`;
-				result = `const ${filename} = require("${value}");`;
+				result = `const ${filename} = require("${value}")`;
 
 				for(let key in specifiers) {
-					result += `\n${tabs}const ${key} = ${filename}.${specifiers[key]};`;
+					result += `;\n${tabs}const ${key} = ${filename}.${specifiers[key]}`;
 				}
 			}
 		}
@@ -966,7 +966,7 @@ function compile_Import(node)
 			if(specifiersLength === 1) 
 			{
 				for(let key in specifiers) {
-					result = `const ${key} = require("${value}");`;
+					result = `const ${key} = require("${value}").${key}`;
 				}
 			}
 			else
@@ -974,10 +974,10 @@ function compile_Import(node)
 				const sourceValue = node.source.value;
 				const name = StringUtils.camelCase(path.basename(sourceValue));
 				const filename = `__${name}`;
-				result = `const ${filename} = require("${value}");`;
+				result = `const ${filename} = require("${value}")`;
 
 				for(let key in specifiers) {
-					result += `\n${tabs}const ${key} = ${filename}.${key}`;
+					result += `;\n${tabs}const ${key} = ${filename}.${key}`;
 				}
 			}
 		}
@@ -1295,6 +1295,26 @@ function compile_ExportDefaultDeclaration(node)
 	return result;
 }
 
+const compile_ObjectPattern = (node) => 
+{
+	let result = "{ "
+
+	const properties = node.properties
+	if(properties.length > 0) 
+	{
+		const prop = properties[0]
+		result += doCompileLookup(prop.key)
+
+		for(let n = 1; n < properties.length; n++) {
+			const prop = properties[n]
+			result += ", " + doCompileLookup(prop.key)
+		}
+	}
+
+	result += " }"
+	return result
+}
+
 function incTabs() 
 {
 	numTabs++;
@@ -1312,7 +1332,7 @@ function decTabs()
 }
 
 function doCompileLookup(node) {
-	return node ? compileLookup[node.type](node) : "";
+	return node ? compileLookup[node.constructor.name](node) : "";
 }
 
 const compileLookup = {
@@ -1355,9 +1375,10 @@ const compileLookup = {
 	Super: compile_Super,
 	TemplateLiteral: compile_TemplateLiteral,
 	EmptyStatement: compile_EmptyStatement,
-	ExportDefaultDeclaration: compile_ExportDefaultDeclaration
-};
+	ExportDefaultDeclaration: compile_ExportDefaultDeclaration,
+	ObjectPattern: compile_ObjectPattern
+}
 
 module.exports = {
 	compile
-};
+}

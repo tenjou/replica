@@ -450,6 +450,21 @@ class ExportSpecifier
 	}
 }
 
+class Property
+{
+	constructor(key, value) {
+		this.key = key;
+		this.value = value;
+	}
+}
+
+class ObjectPattern
+{
+	constructor(properties) {
+		this.properties = properties;
+	}
+}
+
 module.exports = {
 	Identifier,
 	Number,
@@ -498,5 +513,7 @@ module.exports = {
 	TemplateLiteral,
 	EmptyStatement,
 	ExportSpecifier,
-	ExportDefaultDeclaration
+	ExportDefaultDeclaration,
+	Property,
+	ObjectPattern
 };
