@@ -355,29 +355,26 @@ class Catch
 
 class Import
 {
-	constructor(source, specifiers, imported, sourceFile) {
-		this.type = "Import";
-		this.source = source;
-		this.specifiers = specifiers;
-		this.imported = imported;
-		this.sourceFile = sourceFile;
+	constructor(source, specifiers, sourceFile) {
+		this.source = source
+		this.specifiers = specifiers
+		this.sourceFile = sourceFile
 	}
 }
 
-class ImportSpecifier
+class Specifier
 {
-	constructor(imported, local) {
-		this.type = "ImportSpecifier";
-		this.imported = imported;
-		this.local = local;
+	constructor(local, localAs, isDefault) {
+		this.local = local
+		this.localAs = localAs
+		this.isDefault = isDefault
 	}
 }
 
 class Export
 {
 	constructor(decl) {
-		this.type = "Export";
-		this.decl = decl;
+		this.decl = decl
 	}
 }
 
@@ -430,16 +427,6 @@ class EmptyStatement
 	}
 }
 
-class ExportSpecifier
-{
-	constructor(local, exported)
-	{
-		this.type = "ExportSpecifier";
-		this.local = local;
-		this.exported = exported;
-	}
-}
-
 class Property
 {
 	constructor(key, value, kind, computed) {
@@ -454,6 +441,14 @@ class ObjectPattern
 {
 	constructor(properties) {
 		this.properties = properties
+	}
+}
+
+class AssignmentPattern
+{
+	constructor(left, right) {
+		this.left = left
+		this.right = right
 	}
 }
 
@@ -497,14 +492,14 @@ module.exports = {
 	Throw,
 	Catch,
 	Import,
-	ImportSpecifier,
+	Specifier,
 	Export,
 	LogicalExpression,
 	ArrowFunctionExpression,
 	TemplateLiteral,
 	EmptyStatement,
-	ExportSpecifier,
 	ExportDefaultDeclaration,
 	Property,
-	ObjectPattern
+	ObjectPattern,
+	AssignmentPattern
 };

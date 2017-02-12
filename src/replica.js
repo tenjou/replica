@@ -5,11 +5,11 @@ const path = require("path");
 const childProcess = require("child_process");
 const uglifyJS = require("uglify-js");
 const watcher = require("./watcher");
-const lexer = require("./lexer");
+const lexer = require("./compiler/lexer");
 const server = require("./server/server");
 const package = require("../package.json");
 const cli = require("./cli");
-const utils = require("./utils");
+const utils = require("./logger");
 
 const needUpdate = {
 	indexFile: false,
@@ -517,6 +517,14 @@ function start()
 }
 
 console.log();
+
+// console.log(process.argv);
+
+// process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
+//   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
+//   'src/main.js',
+//   '-i',
+//   'index.html' ];
 
 cli.name(package.name)
    .version(package.version)

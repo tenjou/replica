@@ -1,6 +1,7 @@
-const AST = require("./ast.js");
-const path = require("path");
-const utils = require("./utils");
+const AST = require("./ast.js")
+const path = require("path")
+const utils = require("./utils")
+const logger = require("../logger")
 
 let tabs = "";
 let numTabs = 0;
@@ -22,7 +23,7 @@ const clsCtx = {
 	superCls: null
 };
 
-function genRequirementResult(modulesPath) 
+function genRequirementResult(modulesPath)
 {
 	return `(function(scope) {
 	scope.module = { exports: {} };
@@ -34,14 +35,14 @@ function genRequirementResult(modulesPath)
 			NODE_ENV: "dev"
 		}
 	};
-	
-	if(typeof require === "undefined") 
+
+	if(typeof require === "undefined")
 	{
-		window.require = function require(path) 
-		{	
+		window.require = function require(path)
+		{
 			var cwdBuffer = require.cwd;
 
-			if(path[0] === ".") 
+			if(path[0] === ".")
 			{
 				var cwd = (cwdBuffer.length > 0) ? cwdBuffer[cwdBuffer.length - 1].slice() : [ "." ];
 
@@ -49,7 +50,7 @@ function genRequirementResult(modulesPath)
 				for(var n = 0; n < pathBuffer.length - 1; n++) {
 					var item = pathBuffer[n];
 					if(item === ".") { continue;}
-					if(item === "..") 
+					if(item === "..")
 					{
 						if(cwd.length === 0) {
 							cwd.push(item);
@@ -72,7 +73,7 @@ function genRequirementResult(modulesPath)
 				var importPath = cwd.join("/") + "/" + filename;
 
 				var content = modulesCached[importPath];
-				if(!content) 
+				if(!content)
 				{
 					window.module = { exports: {} };
 
@@ -88,7 +89,7 @@ function genRequirementResult(modulesPath)
 
 			var modulePath = modulesPath[path];
 			var content = modulesCached[modulePath];
-			if(!content) 
+			if(!content)
 			{
 				window.module = { exports: {} };
 
@@ -113,10 +114,10 @@ function genRequirementResult(modulesPath)
 		var protoA = a.prototype;
 		var proto = Object.create(b.prototype);
 
-		for(var key in protoA) 
+		for(var key in protoA)
 		{
 			var param = Object.getOwnPropertyDescriptor(protoA, key);
-			if(param.get || param.set) { 
+			if(param.get || param.set) {
 				Object.defineProperty(proto, key, param);
 			}
 			else {
@@ -159,11 +160,11 @@ function genModulePaths()
 
 function compile(file, flags)
 {
-	if(!flags) 
+	if(!flags)
 	{
 		flags = {
 			type: "content"
-		}	
+		}
 	}
 
 	context.flags = flags;
@@ -190,23 +191,23 @@ function compileFile(file)
 	}
 
 	let result = compileContent(file, false);
-	return result;	
+	return result;
 }
 
-function compileContent(file, needModule) 
+function compileContent(file, needModule)
 {
 	let result = "";
 
 	file.compileIndex = context.compileIndex;
 
-	if(context.flags.concat) 
+	if(context.flags.concat)
 	{
 		let imports = file.imports;
-		for(let n = 0; n < imports.length; n++) 
+		for(let n = 0; n < imports.length; n++)
 		{
 			let fileImport = imports[n];
-			if(fileImport.compileIndex >= context.compileIndex) { 
-				continue; 
+			if(fileImport.compileIndex >= context.compileIndex) {
+				continue;
 			}
 
 			if(!fileImport.blockNode) {
@@ -232,7 +233,7 @@ function compileContent(file, needModule)
 			relativePath = "./" + relativePath;
 		}
 		relativePath = relativePath.toLowerCase();
-		
+
 		result += `modules["${relativePath}"] = function() `;
 		result += compile_Block(file.blockNode, compileSourceExports);
 
@@ -245,7 +246,7 @@ function compileContent(file, needModule)
 	return result;
 }
 
-function compileImports(file) 
+function compileImports(file)
 {
 	context.compileIndex++;
 
@@ -260,7 +261,7 @@ function gatherImports(file, buffer)
 	const imports = file.imports;
 	if(imports.length === 0) { return; }
 
-	for(let n = 0; n < imports.length; n++) 
+	for(let n = 0; n < imports.length; n++)
 	{
 		let importedFile = imports[n];
 
@@ -281,7 +282,7 @@ function compileSourceExports()
 
 	let result = "module.exports = ";
 
-	if(context.currSourceFile.exportDefault) 
+	if(context.currSourceFile.exportDefault)
 	{
 		const node = sourceExports[0];
 		if(node instanceof AST.New) {
@@ -298,7 +299,7 @@ function compileSourceExports()
 		let node = sourceExports[0];
 		result += getNameFromNode(node);
 
-		for(let n = 1; n < sourceExports.length; n++) 
+		for(let n = 1; n < sourceExports.length; n++)
 		{
 			let node = sourceExports[n];
 			result += ", " + getNameFromNode(node);
@@ -312,18 +313,18 @@ function compileSourceExports()
 
 		result += " };";
 	}
-	
+
 	return result;
 }
 
 function getNameFromNode(node)
 {
 	if((node instanceof AST.Function) ||
-	   (node instanceof AST.Class)) 
+	   (node instanceof AST.Class))
 	{
 		return node.id.value;
 	}
-	else if(node instanceof AST.VariableDeclaration) 
+	else if(node instanceof AST.VariableDeclaration)
 	{
 		const decls = node.decls;
 		let declNode = decls[0];
@@ -336,8 +337,8 @@ function getNameFromNode(node)
 
 		return result;
 	}
-	else if(node instanceof AST.ExportSpecifier) {
-		const result = compile_ExportSpecifier(node);
+	else if(node instanceof AST.Specifier) {
+		const result = compile_Specifier(node);
 		return result;
 	}
 	else if(node instanceof AST.Identifier) {
@@ -354,11 +355,11 @@ function getNameFromNode(node)
 }
 
 function compile_Identifier(node) {
-	return node.value;
+	return node ? node.value : null
 }
 
 function compile_Number(node) {
-	return node.value;
+	return node ? node.value : null
 }
 
 function compile_Bool(node) {
@@ -369,14 +370,14 @@ function compile_String(node) {
 	return node.raw;
 }
 
-function compile_New(node) 
+function compile_New(node)
 {
 	let callee = doCompileLookup(node.callee);
 	if(node.callee.type === "Conditional") {
 		callee = "(" + callee + ")";
 	}
 
-	const result = "new " + callee + 
+	const result = "new " + callee +
 		"(" + compile_Args(node.args) + ")";
 
 	return result;
@@ -391,13 +392,13 @@ function compile_Name(node)
 	let result = "";
 
 	const parentNode = node.parent;
-	if(parentNode) 
+	if(parentNode)
 	{
-		if(parentNode.type !== "Identifier" && 
+		if(parentNode.type !== "Identifier" &&
 		   parentNode.type !== "Call" &&
 		   parentNode.type !== "ThisExpression" &&
 		   parentNode.type !== "Name" &&
-		   parentNode.type !== "Super") 
+		   parentNode.type !== "Super")
 		{
 			result += "(" + doCompileLookup(parentNode) + ")";
 		}
@@ -412,7 +413,7 @@ function compile_Name(node)
 	else {
 		result += "." + doCompileLookup(node.value);
 	}
-	
+
 	return result;
 }
 
@@ -421,7 +422,7 @@ function compile_VariableDeclaration(node)
 	const decls = node.decls;
 
 	let result = node.kind + " " + compile_VariableNode(decls[0]);
-	
+
 	for(let n = 1; n < decls.length; n++) {
 		result += ", " + compile_VariableNode(decls[n]);
 	}
@@ -438,7 +439,7 @@ function compile_VariableNode(node)
 		return result;
 	}
 
-	return declName;		
+	return declName;
 }
 
 function compile_Array(node)
@@ -489,7 +490,7 @@ function compile_ObjectMember(node)
 		key = `[${key}]`;
 	}
 
-	if(node.kind && node.kind !== "init") 
+	if(node.kind && node.kind !== "init")
 	{
 		let value;
 		if(node.value instanceof AST.Function) {
@@ -501,7 +502,7 @@ function compile_ObjectMember(node)
 
 		result = node.kind + " " + key + value;
 	}
-	else 
+	else
 	{
 		const value = doCompileLookup(node.value);
 		result = key + ": " + value;
@@ -543,7 +544,7 @@ function compile_Update(node)
 	else {
 		result = doCompileLookup(node.arg) + node.op;
 	}
-	
+
 	return result;
 }
 
@@ -563,8 +564,8 @@ function compile_Call_ecma5(node)
 
 	let result;
 
-	if(node.value.type === "Super" || 
-	   (node.value.type == "Name" && node.value.parent.type === "Super")) 
+	if(node.value.type === "Super" ||
+	   (node.value.type == "Name" && node.value.parent.type === "Super"))
 	{
 		result = value + ".call(this";
 		if(args) {
@@ -573,10 +574,10 @@ function compile_Call_ecma5(node)
 		result += ")";
 	}
 	else if(node.value instanceof AST.Function) {
-		result = `(${value}) (${args})`;	
+		result = `(${value}) (${args})`;
 	}
 	else {
-		result = value + "(" + args + ")";	
+		result = value + "(" + args + ")";
 	}
 
 	return result;
@@ -585,7 +586,7 @@ function compile_Call_ecma5(node)
 function compile_Call_ecma6(node)
 {
 	let result = doCompileLookup(node.value);
-	result += "(" + compile_Args(node.args) + ")";	
+	result += "(" + compile_Args(node.args) + ")";
 }
 
 function compile_Args(args)
@@ -633,7 +634,7 @@ function compile_Block(node, appendFunc)
 
 	let blockResult = "";
 	const body = node.scope.body;
-	for(let n = 0; n < body.length; n++) 
+	for(let n = 0; n < body.length; n++)
 	{
 		let node = body[n];
 
@@ -643,7 +644,7 @@ function compile_Block(node, appendFunc)
 		}
 
 		if(node.type !== "Function" &&
-		   node.type !== "If" && 
+		   node.type !== "If" &&
 		   node.type !== "Switch" &&
 		   node.type !== "For" &&
 		   node.type !== "ForIn" &&
@@ -651,7 +652,7 @@ function compile_Block(node, appendFunc)
 		   node.type !== "DoWhile" &&
 		   node.type !== "Label" &&
 		   node.type !== "Try" &&
-		   node.type !== "Class") 
+		   node.type !== "Class")
 		{
 			blockResult += tabs + nodeResult + ";\n";
 		}
@@ -660,7 +661,7 @@ function compile_Block(node, appendFunc)
 		}
 	}
 
-	if(appendFunc) 
+	if(appendFunc)
 	{
 		let appendResult = appendFunc();
 		if(appendResult) {
@@ -670,7 +671,7 @@ function compile_Block(node, appendFunc)
 
 	decTabs();
 
-	if(numTabs) 
+	if(numTabs)
 	{
 		if(!blockResult) {
 			return "{}";
@@ -690,7 +691,7 @@ function compile_Return(node)
 	if(content) {
 		result += " " + content;
 	}
-	
+
 	return result;
 }
 
@@ -698,7 +699,7 @@ function compile_If(node)
 {
 	let result = "if(" + doCompileLookup(node.test) + ") ";
 
-	if(node.consequent.type !== "Block") 
+	if(node.consequent.type !== "Block")
 	{
 		incTabs();
 		result += doCompileLookup(node.consequent) + ";\n";
@@ -718,7 +719,7 @@ function compile_If(node)
 		{
 			result += "\n" + tabs + "else ";
 
-			if(node.alternate.type !== "Block") 
+			if(node.alternate.type !== "Block")
 			{
 				incTabs();
 				result += doCompileLookup(node.alternate) + ";\n";
@@ -810,7 +811,7 @@ function compile_SwitchCase(node)
 
 	let prevNode = null;
 	const buffer = node.scope.body;
-	for(let n = 0; n < buffer.length; n++) 
+	for(let n = 0; n < buffer.length; n++)
 	{
 		let bufferNode = buffer[n];
 		if(bufferNode instanceof AST.Block) {
@@ -818,7 +819,7 @@ function compile_SwitchCase(node)
 			result += tabs + compile_Block(bufferNode);
 			incTabs();
 		}
-		else 
+		else
 		{
 			if(prevNode && prevNode instanceof AST.Block) {
 				result += " " + doCompileLookup(bufferNode) + ";\n";
@@ -840,9 +841,9 @@ function compile_Break(node) {
 	return "break";
 }
 
-function compile_For(node) 
+function compile_For(node)
 {
-	let result = "for(" + 
+	let result = "for(" +
 		doCompileLookup(node.init) + "; " +
 		doCompileLookup(node.test) + "; " +
 		doCompileLookup(node.update) + ") " +
@@ -855,7 +856,7 @@ function compile_ForIn(node)
 {
 	let result = "for(" +
 		doCompileLookup(node.left) + " in " +
-		doCompileLookup(node.right) + ") " + 
+		doCompileLookup(node.right) + ") " +
 		doCompileLookup(node.body);
 
 	return result;
@@ -863,12 +864,12 @@ function compile_ForIn(node)
 
 function compile_While(node)
 {
-	if(node.body instanceof AST.EmptyStatement) { 
-		return ""; 
+	if(node.body instanceof AST.EmptyStatement) {
+		return "";
 	}
 
 	let result = "while(" +
-		doCompileLookup(node.test) + ") " + 
+		doCompileLookup(node.test) + ") " +
 		doCompileLookup(node.body);
 
 	return result;
@@ -876,8 +877,8 @@ function compile_While(node)
 
 function compile_DoWhile(node)
 {
-	let result = "do " + 
-		doCompileLookup(node.body) + 
+	let result = "do " +
+		doCompileLookup(node.body) +
 		" while(" + doCompileLookup(node.test) + ")";
 
 	return result;
@@ -889,7 +890,7 @@ function compile_Continue(node) {
 
 function compile_Label(node)
 {
-	let result = doCompileLookup(node.name) + ": " + 
+	let result = doCompileLookup(node.name) + ": " +
 		doCompileLookup(node.body);
 
 	return result;
@@ -901,7 +902,7 @@ function compile_Sequence(node)
 
 	let exprNode = exprs[0];
 	let result = doCompileLookup(exprNode);
-	
+
 	for(let n = 1; n < exprs.length; n++) {
 		exprNode = exprs[n];
 		result += ", " + doCompileLookup(exprNode);
@@ -912,7 +913,7 @@ function compile_Sequence(node)
 
 function compile_Try(node)
 {
-	let result = "try " + 
+	let result = "try " +
 		compile_Block(node.block) +
 		"\n" + tabs + "catch(" + doCompileLookup(node.handler.param) + ") " +
 		compile_Block(node.handler.body);
@@ -927,13 +928,12 @@ function compile_Throw(node)
 	return result;
 }
 
-function compile_Import(node) 
+function compile_Import(node)
 {
 	const specifiers = node.specifiers;
-	const specifiersLength = Object.keys(specifiers).length;
 
 	let value = node.source.value;
-	if(value[0] === ".") 
+	if(value[0] === ".")
 	{
 		if(!path.extname(value)) {
 			value += ".js";
@@ -941,47 +941,41 @@ function compile_Import(node)
 	}
 	value = value.toLowerCase();
 
-	let result = "";
+	let result;
 
 	if(context.flags.transpiling)
 	{
-		if(!node.imported)
+		if(specifiers.length === 1)
 		{
-			if(specifiersLength === 1) 
-			{
-				for(let key in specifiers) {
-					result = `const ${key} = require("${value}").${specifiers[key]}`;
-				}
+			const specifier = specifiers[0]
+			const localAs = compile_Identifier(specifier.localAs)
+			const local = specifiers.local ? compile_Identifier(specifier.local) : localAs
+			
+			if(specifier.isDefault) {
+				result = `const ${local} = require("${value}")`
 			}
-			else
-			{
-				const sourceValue = node.source.value;
-				const name = utils.camelCase(path.basename(sourceValue));
-				const filename = `__${name}`;
-				result = `const ${filename} = require("${value}")`;
-
-				for(let key in specifiers) {
-					result += `;\n${tabs}const ${key} = ${filename}.${specifiers[key]}`;
-				}
+			else {
+				result = `const ${local} = require("${value}").${localAs}`
 			}
 		}
 		else
 		{
-			if(specifiersLength === 1) 
-			{
-				for(let key in specifiers) {
-					result = `const ${key} = require("${value}").${key}`;
-				}
-			}
-			else
-			{
-				const sourceValue = node.source.value;
-				const name = utils.camelCase(path.basename(sourceValue));
-				const filename = `__${name}`;
-				result = `const ${filename} = require("${value}")`;
+			const sourceValue = node.source.value
+			const name = utils.camelCase(path.basename(sourceValue))
+			const filename = `__${name}`
+			result = `const ${filename} = require("${value}")`
 
-				for(let key in specifiers) {
-					result += `;\n${tabs}const ${key} = ${filename}.${key}`;
+			for(let n = 0; n < specifiers.length; n++)
+			{
+				const specifier = specifiers[n]
+				const local = compile_Identifier(specifier.local)
+				
+				if(specifier.isDefault) {
+					result += `;\n${tabs}const ${local} = ${filename}`
+				}
+				else {
+					const localAs = specifier.localAs ? compile_Identifier(specifier.localAs) : local
+					result += `;\n${tabs}const ${localAs} = ${filename}.${local}`
 				}
 			}
 		}
@@ -993,46 +987,39 @@ function compile_Import(node)
 	else
 	{
 		result += "import " +
-			compile_ImportSpecifiers(specifiers) + 
-			" from " + 
+			compile_Specifiers(specifiers) +
+			" from " +
 			doCompileLookup(node.source);
 	}
 
 	return result;
 }
 
-function compile_ImportSpecifiers(specifiers)
+function compile_Specifiers(specifiers)
 {
 	let node = specifiers[0];
 
-	if(!node.imported) {
+	if(!node.localAs) {
 		return doCompileLookup(node.local);
 	}
 
-	let result = "{ " + compile_ImportSpecifier(node)
+	let result = "{ " + compile_Specifier(node)
 
 	for(let n = 1; n < specifiers.length; n++) {
 		node = specifiers[n];
-		result += ", " + compile_ImportSpecifier(node)
+		result += ", " + compile_Specifier(node)
 	}
-	
+
 	result += " }";
 
 	return result;
 }
 
-function compile_ImportSpecifier(node)
-{
-	let local = doCompileLookup(node.local);
-	let imported = doCompileLookup(node.imported);
-	if(local === imported) {
-		return local;
-	}
-
-	return imported + " as " + local;
+function compile_Specifier(node) {
+	return node.localAs ? doCompileLookup(node.localAs) : doCompileLookup(node.local)
 }
 
-function compile_Export(node) 
+function compile_Export(node)
 {
 	if(context.flags.transpiling) {
 		return doCompileLookup(node.decl);
@@ -1060,7 +1047,7 @@ function compile_Class_ecma5(node)
 
 	if(clsCtx.superCls) {
 		requirements.inherits = true;
-		result += "\n" + tabs + "_inherits(" + clsCtx.id + ", " + clsCtx.superCls + ");\n"; 
+		result += "\n" + tabs + "_inherits(" + clsCtx.id + ", " + clsCtx.superCls + ");\n";
 	}
 
 	clsCtx.inside = false;
@@ -1084,7 +1071,7 @@ function compile_Class_ecma6(node)
 
 	result += tabs + "}";
 
-	return result;		
+	return result;
 }
 
 function compile_ClassBody_ecma6(node)
@@ -1108,7 +1095,7 @@ function compile_ClassBody_ecma5(node)
 	incTabs();
 
 	const buffer = node.buffer;
-	for(let n = 0; n < buffer.length; n++) 
+	for(let n = 0; n < buffer.length; n++)
 	{
 		const bufferNode = buffer[n];
 
@@ -1119,7 +1106,7 @@ function compile_ClassBody_ecma5(node)
 			clsCtx.insideConstr = false;
 			incTabs();
 		}
-		else 
+		else
 		{
 			const protoDecl = proto ? ",\n" : "";
 			proto += protoDecl + tabs + compile_MethodDef_ecma5(bufferNode);
@@ -1138,7 +1125,7 @@ function compile_ClassBody_ecma5(node)
 
 	const result = constrResult + proto;
 
-	return result;	
+	return result;
 }
 
 function compile_MethodDef_ecma6(node)
@@ -1150,7 +1137,7 @@ function compile_MethodDef_ecma6(node)
 		result = node.kind + " ";
 	}
 	result += key + compile_Function(node.value, true);
-	
+
 	return result;
 }
 
@@ -1165,7 +1152,7 @@ function compile_MethodDef_ecma5(node)
 	else {
 		result = key + ": " + compile_Function(node.value, false);
 	}
-	
+
 	return result;
 }
 
@@ -1180,7 +1167,7 @@ function compile_LogicalExpression(node)
 
 	let result;
 
-	if(node.left instanceof AST.Binary) 
+	if(node.left instanceof AST.Binary)
 	{
 		if(node.right instanceof AST.Binary) {
 			result = `(${left}) ${node.op} (${right})`;
@@ -1243,7 +1230,7 @@ function compile_TemplateLiteral(node)
 	else
 	{
 		for(let n = 0; n < quasis.length - 1; n++) {
-			result += compile_Quasis(quasis[n]) + "\" + " + doCompileLookup(expressions[n]) + " + \""; 
+			result += compile_Quasis(quasis[n]) + "\" + " + doCompileLookup(expressions[n]) + " + \"";
 		}
 
 		result += quasis[num].value;
@@ -1285,7 +1272,7 @@ function compile_ExportDefaultDeclaration(node)
 	const decl = node.decl;
 
 	let result = "module.exports = ";
-	
+
 	if(decl instanceof AST.Binary) {
 		 result += doCompileLookup(decl.right);
 	}
@@ -1299,12 +1286,12 @@ function compile_ExportDefaultDeclaration(node)
 	return result;
 }
 
-const compile_ObjectPattern = (node) => 
+const compile_ObjectPattern = (node) =>
 {
 	let result = "{ "
 
 	const properties = node.properties
-	if(properties.length > 0) 
+	if(properties.length > 0)
 	{
 		const prop = properties[0]
 		result += doCompileLookup(prop.key)
@@ -1319,15 +1306,20 @@ const compile_ObjectPattern = (node) =>
 	return result
 }
 
-function incTabs() 
+const compile_AssignmentPattern = (node) => {
+	const result = doCompileLookup(node.left)
+	return result
+}
+
+function incTabs()
 {
 	numTabs++;
 	if(numTabs > 1) {
 		tabs += "\t";
-	} 
+	}
 }
 
-function decTabs() 
+function decTabs()
 {
 	if(numTabs > 1) {
 		tabs = tabs.slice(0, -1);
@@ -1380,7 +1372,8 @@ const compileLookup = {
 	TemplateLiteral: compile_TemplateLiteral,
 	EmptyStatement: compile_EmptyStatement,
 	ExportDefaultDeclaration: compile_ExportDefaultDeclaration,
-	ObjectPattern: compile_ObjectPattern
+	ObjectPattern: compile_ObjectPattern,
+	AssignmentPattern: compile_AssignmentPattern
 }
 
 module.exports = {

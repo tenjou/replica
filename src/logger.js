@@ -31,12 +31,6 @@ const createTimestamp = () => {
 		"]"
 }
 
-const camelCase = (string) => {
-    return string.replace(/-([a-z])/ig, (all, letter) => {
-        return letter.toUpperCase()
-    })
-}
-
 module.exports = {
-	logGreen, logYellow, logMagenta, logError, createTimestamp, camelCase
+	logGreen, logYellow, logMagenta, logError, createTimestamp
 }

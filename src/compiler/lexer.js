@@ -3,7 +3,7 @@ const path = require("path");
 const acorn = require("./acorn.js");
 const AST = require("./ast.js");
 const compiler = require("./compiler.js");
-const utils = require("./utils");
+const logger = require("../logger");
 
 const ctx = {
 	sourceFiles: {},
@@ -632,17 +632,10 @@ function parse_CatchClause(node)
 	return catchClause;
 }
 
-function parse_ImportDeclaration(node)
+function parse_ImportDeclaration(node, exported)
 {
-	const specifiersMap = {};
-
 	const source = doLookup(node.source);
-	const imported = parse_ImportSpecifiers(node.specifiers, specifiersMap);
-
-	const importsMap = ctx.currSourceFile.importsMap;
-	for(const key in specifiersMap) {
-		importsMap[key] = true;
-	}
+	const specifiers = exported ? parse_ExportSpecifiers(node.specifiers) : parse_ImportSpecifiers(node.specifiers);
 
 	const moduleName = source.value;
 
@@ -663,7 +656,7 @@ function parse_ImportDeclaration(node)
 		}
 
 		if(!fs.existsSync(modulePath)) {
-			utils.logError("ModuleNotFound", moduleName);
+			logger.logError("ModuleNotFound", moduleName);
 			return;
 		}
 
@@ -671,14 +664,14 @@ function parse_ImportDeclaration(node)
 		{
 			const packagePath = modulePath + "/package.json";
 			if(!fs.existsSync(packagePath)) {
-				utils.logError("PackageNotFound", moduleName);
+				logger.logError("PackageNotFound", moduleName);
 				return;
 			}
 
 			const packageContent = JSON.parse(fs.readFileSync(packagePath, "utf8"));
 			const mainEntry = packageContent.main;
 			if(!mainEntry) {
-				utils.logError("PackageEntryNotFound", moduleName);
+				logger.logError("PackageEntryNotFound", moduleName);
 				return;
 			}
 
@@ -706,32 +699,34 @@ function parse_ImportDeclaration(node)
 		throw `Circular import detected in:\n    "${ctx.currSourceFile.rootPath + ctx.currSourceFile.filename}"\n because of importing:\n    "${fullPath}"`;
 	}
 
-	const importDecl = new AST.Import(source, specifiersMap, imported, sourceFile);
+	const importDecl = new AST.Import(source, specifiers, sourceFile);
 	ctx.currSourceFile.imports.push(sourceFile);
 
 	return importDecl;
 }
 
-function parse_ImportSpecifiers(specifiers, map)
+function parse_ImportSpecifiers(specifiers)
 {
-	let isImported = false;
+	const importsMap = ctx.currSourceFile.importsMap;
 
-	for(let n = 0; n < specifiers.length; n++)
-	{
-		const node = specifiers[n];
-		const imported = doLookup(node.imported);
-		const local = doLookup(node.local);
-
-		if(!imported) {
-			map[local.value] = null;
-			isImported = true;
-		}
-		else {
-			map[local.value] = imported.value;
-		}
+	const num = specifiers.length
+	const buffer = new Array(num)
+	for(let n = 0; n < num; n++) {
+		const specifier = parse_ImportSpecifier(specifiers[n])
+		const key = specifier.localAs ? specifier.localAs.value : specifier.local.value
+		importsMap[key] = true
+		buffer[n] = specifier
 	}
 
-	return isImported;
+	return buffer
+}
+
+function parse_ImportSpecifier(node)
+{
+	const local = doLookup(node.local)
+	const imported = doLookup(node.imported)
+	const importSpecifier = new AST.Specifier(imported, local, (node.type === "ImportDefaultSpecifier"))
+	return importSpecifier
 }
 
 function parse_ExportNamedDeclaration(node)
@@ -740,7 +735,7 @@ function parse_ExportNamedDeclaration(node)
 
 	let source = null;
 	if(node.source) {
-		source = parse_ImportDeclaration(node);
+		source = parse_ImportDeclaration(node, true);
 	}
 
 	if(specifiers.length > 0) 
@@ -760,13 +755,27 @@ function parse_ExportNamedDeclaration(node)
 	return decl;
 }
 
+function parse_ExportSpecifiers(specifiers)
+{
+	const importsMap = ctx.currSourceFile.importsMap;
+
+	const num = specifiers.length
+	const buffer = new Array(num)
+	for(let n = 0; n < num; n++) {
+		const specifier = parse_ExportSpecifier(specifiers[n])
+		importsMap[specifier.localAs.value] = true
+		buffer[n] = specifier
+	}
+
+	return buffer
+}
+
 function parse_ExportSpecifier(node)
 {
-	const local = doLookup(node.local);
-	const exported = doLookup(node.exported);
-
-	const exportSpecifier = new AST.ExportSpecifier(local, exported);
-	return exportSpecifier;
+	const local = doLookup(node.local)
+	const exported = doLookup(node.exported)
+	const exportSpecifier = new AST.Specifier(local, exported, (node.type === "ExportDefaultSpecifier"));
+	return exportSpecifier
 }
 
 function parse_ExportDefaultDeclaration(node)
@@ -852,6 +861,13 @@ const parse_Property = (node) => {
 	return property
 }
 
+const parse_AssignmentPattern = (node) => {
+	const left = doLookup(node.left)
+	const right = doLookup(node.right)
+	const assignmentPattern = new AST.AssignmentPattern(left, right)
+	return assignmentPattern
+}
+
 function doLookup(node) {
 	return node ? lookup[node.type](node) : null
 }
@@ -904,7 +920,8 @@ const lookup = {
 	EmptyStatement: parse_EmptyStatement,
 	ExportDefaultDeclaration: parse_ExportDefaultDeclaration,
 	ObjectPattern: parse_ObjectPattern,
-	Property: parse_Property
+	Property: parse_Property,
+	AssignmentPattern: parse_AssignmentPattern
 };
 
 module.exports = {
