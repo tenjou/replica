@@ -893,8 +893,7 @@ function compile_Import(node)
 		}
 		else
 		{
-			const baseFilename = new Buffer(value).toString("base64")
-			const filename = baseFilename.slice(0, baseFilename.lastIndexOf("=") - 1)
+			const filename = `__module${node.sourceFile.id}`
 			result = `const ${filename} = ${moduleExportsFile}`
 
 			for(let n = 0; n < numSpecifiers; n++)
