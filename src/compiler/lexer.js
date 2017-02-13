@@ -23,7 +23,7 @@ const modules = {};
 
 class SourceFile
 {
-	constructor(id, filePath) 
+	constructor(id, filePath)
 	{
 		const slash = path.normalize("/");
 
@@ -31,6 +31,7 @@ class SourceFile
 		this.rootPath = path.dirname(filePath) + slash;
 		this.filename = path.basename(filePath);
 		this.extname = path.extname(this.filename);
+
 		this.compileIndex = 0;
 		this.timestamp = Date.now();
 		this.blockNode = null;
@@ -48,17 +49,25 @@ class SourceFile
 		this.importsMap = {};
 		this.imports.length = 0;
 		this.exports.length = 0;
-		this.timestamp = Date.now();		
+		this.timestamp = Date.now();
 	}
 
-	update() 
+	update()
 	{
-		const filePath = this.rootPath + this.filename;
+		let filePath = this.rootPath + this.filename;
 
-		if(!fs.existsSync(filePath)) {
-			this.blockNode = null;
-			console.error("(SourceFile.update) No such file exists:", filePath);
-			return;
+		if(!fs.existsSync(filePath))
+		{
+			if(fs.existsSync(filePath + ".js")) {
+				filePath += ".js"
+				this.filename += ".js"
+				this.extname = ".js"
+			}
+			else {
+				this.blockNode = null;
+				console.error("(SourceFile.update) No such file exists:", filePath);
+				return;
+			}
 		}
 
 		this.updating = true;
@@ -79,7 +88,7 @@ class SourceFile
 
 				const prevSourceFile = ctx.currSourceFile;
 				ctx.currSourceFile = this;
-				
+
 				this.clear();
 				this.blockNode = parse_BlockStatement(node);
 
@@ -121,7 +130,7 @@ function getSourceFile(filePath)
 	return sourceFile;
 }
 
-function parse(filePath) 
+function parse(filePath)
 {
 	const sourceFile = getSourceFile(filePath);
 	return sourceFile;
@@ -133,7 +142,7 @@ function parseAll(filePath)
 	return sourceFile;
 }
 
-function compile(sourceFile, needModule) 
+function compile(sourceFile, needModule)
 {
 	const result = compiler.compile(sourceFile, {
 		type: "content",
@@ -144,7 +153,7 @@ function compile(sourceFile, needModule)
 	return result;
 }
 
-function compileAll(sourceFile) 
+function compileAll(sourceFile)
 {
 	const result = compiler.compile(sourceFile, {
 		type: "content",
@@ -157,7 +166,7 @@ function compileAll(sourceFile)
 	return result;
 }
 
-function getImports(sourceFile) 
+function getImports(sourceFile)
 {
 	if(!sourceFile) {
 		console.error("(getImports) Invalid sourceFile passed");
@@ -194,7 +203,7 @@ function parse_Text(text)
 function parse_JSON(text)
 {
 	text = "\"" + text.replace(/\n|\r|\t/g, "").replace(/\"/g, "\\\"") + "\"";
-		
+
 	const textNode = new AST.String(null, text);
 
 	const parentNameNode = new AST.Identifier("JSON");
@@ -303,7 +312,7 @@ function parse_ObjectMember(node)
 	return objMemberExpr;
 }
 
-function parse_NewExpression(node) 
+function parse_NewExpression(node)
 {
 	const callee = doLookup(node.callee);
 	const args = parse_Args(node.arguments);
@@ -316,7 +325,7 @@ function parse_NullExpression(node) {
 	return new AST.Null();
 }
 
-function parse_ConditionalExpression(node) 
+function parse_ConditionalExpression(node)
 {
 	const test = doLookup(node.test);
 	const consequent = doLookup(node.consequent);
@@ -392,7 +401,7 @@ function parse_VariableDeclaration(node)
 {
 	const decls = node.declarations;
 	const vars = new Array(decls.length);
-	
+
 	for(let n = 0; n < decls.length; n++) {
 		vars[n] = parse_VariableDeclarator(decls[n]);
 	}
@@ -404,7 +413,7 @@ function parse_VariableDeclaration(node)
 function parse_VariableDeclarator(node)
 {
 	const id = doLookup(node.id);
-	const init = doLookup(node.init); 
+	const init = doLookup(node.init);
 
 	const varDecl = new AST.Variable(id, init);
 	return varDecl;
@@ -412,7 +421,7 @@ function parse_VariableDeclarator(node)
 
 function parse_Args(nodes)
 {
-	const num = nodes.length;		
+	const num = nodes.length;
 	const args = new Array(num);
 
 	for(let n = 0; n < num; n++) {
@@ -468,7 +477,7 @@ function parse_MethodDefinition(node)
 	return methodDef;
 }
 
-function parse_BlockStatement(node) 
+function parse_BlockStatement(node)
 {
 	if(!node) { return null; }
 
@@ -488,7 +497,7 @@ function parse_Body(body, scope)
 		let node = body[n];
 		let expr = doLookup(node);
 		buffer.push(expr);
-	}	
+	}
 }
 
 function parse_ReturnStatement(node)
@@ -546,7 +555,7 @@ function parse_Consequent(consequent)
 	return scope;
 }
 
-function parse_BreakStatement(node) 
+function parse_BreakStatement(node)
 {
 	const breakExpr = new AST.Break();
 	return breakExpr;
@@ -640,7 +649,7 @@ function parse_ImportDeclaration(node, exported)
 	const moduleName = source.value;
 
 	let fullPath;
-	if(moduleName[0] !== ".") 
+	if(moduleName[0] !== ".")
 	{
 		let modulePath;
 		let custom;
@@ -738,7 +747,7 @@ function parse_ExportNamedDeclaration(node)
 		source = parse_ImportDeclaration(node, true);
 	}
 
-	if(specifiers.length > 0) 
+	if(specifiers.length > 0)
 	{
 		for(let n = 0; n < specifiers.length; n++) {
 			const exportSpecifier = parse_ExportSpecifier(specifiers[n]);

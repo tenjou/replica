@@ -36,79 +36,6 @@ function genRequirementResult(modulesPath)
 		}
 	};
 
-	if(typeof require === "undefined")
-	{
-		window.require = function require(path)
-		{
-			var cwdBuffer = require.cwd;
-
-			if(path[0] === ".")
-			{
-				var cwd = (cwdBuffer.length > 0) ? cwdBuffer[cwdBuffer.length - 1].slice() : [ "." ];
-
-				var pathBuffer = path.split("/");
-				for(var n = 0; n < pathBuffer.length - 1; n++) {
-					var item = pathBuffer[n];
-					if(item === ".") { continue;}
-					if(item === "..")
-					{
-						if(cwd.length === 0) {
-							cwd.push(item);
-						}
-						else {
-							cwd.pop();
-						}
-					}
-					else {
-						cwd.push(item);
-					}
-				}
-
-				var filename = pathBuffer.pop();
-				var index = filename.lastIndexOf(".");
-				if(index === -1) {
-					filename += ".js";
-				}
-
-				var importPath = cwd.join("/") + "/" + filename;
-
-				var content = modulesCached[importPath];
-				if(!content)
-				{
-					window.module = { exports: {} };
-
-					cwdBuffer.push(cwd);
-					modules[importPath]();
-					modulesCached[importPath] = module.exports;
-					content = module.exports;
-					cwdBuffer.pop();
-				}
-
-				return content;
-			}
-
-			var modulePath = modulesPath[path];
-			var content = modulesCached[modulePath];
-			if(!content)
-			{
-				window.module = { exports: {} };
-
-				var modulePathBuffer = modulePath.split("/");
-				modulePathBuffer.pop();
-
-				cwdBuffer.push(modulePathBuffer);
-				modules[modulePath]();
-				modulesCached[modulePath] = module.exports;
-				content = module.exports;
-				cwdBuffer.pop();
-			}
-
-			return content;
-		};
-
-		window.require.cwd = [];
-	}
-
 	scope._inherits = function(a, b)
 	{
 		var protoA = a.prototype;
@@ -234,8 +161,9 @@ function compileContent(file, needModule)
 		}
 		relativePath = relativePath.toLowerCase();
 
-		result += `modules["${relativePath}"] = function() `;
+		result += `(function() `;
 		result += compile_Block(file.blockNode, compileSourceExports);
+		result += ")();"
 
 		decTabs();
 	}
@@ -280,7 +208,7 @@ function compileSourceExports()
 	const sourceExports = context.currSourceFile.exports;
 	if(sourceExports.length === 0) { return ""; }
 
-	let result = "module.exports = ";
+	let result = `modules[${context.currSourceFile.id}] = `;
 
 	if(context.currSourceFile.exportDefault)
 	{
@@ -945,27 +873,31 @@ function compile_Import(node)
 
 	if(context.flags.transpiling)
 	{
-		if(specifiers.length === 1)
+		const numSpecifiers = specifiers.length
+		if(numSpecifiers === 0) { return }
+
+		const moduleExportsFile = `modules[${node.sourceFile.id}]`
+
+		if(numSpecifiers === 1)
 		{
 			const specifier = specifiers[0]
 			const localAs = compile_Identifier(specifier.localAs)
 			const local = specifiers.local ? compile_Identifier(specifier.local) : localAs
 			
 			if(specifier.isDefault) {
-				result = `const ${local} = require("${value}")`
+				result = `const ${local} = ${moduleExportsFile}`
 			}
 			else {
-				result = `const ${local} = require("${value}").${localAs}`
+				result = `const ${local} = ${moduleExportsFile}.${localAs}`
 			}
 		}
 		else
 		{
-			const sourceValue = node.source.value
-			const name = utils.camelCase(path.basename(sourceValue))
-			const filename = `__${name}`
-			result = `const ${filename} = require("${value}")`
+			const baseFilename = new Buffer(value).toString("base64")
+			const filename = baseFilename.slice(0, baseFilename.lastIndexOf("=") - 1)
+			result = `const ${filename} = ${moduleExportsFile}`
 
-			for(let n = 0; n < specifiers.length; n++)
+			for(let n = 0; n < numSpecifiers; n++)
 			{
 				const specifier = specifiers[n]
 				const local = compile_Identifier(specifier.local)
@@ -978,10 +910,6 @@ function compile_Import(node)
 					result += `;\n${tabs}const ${localAs} = ${filename}.${local}`
 				}
 			}
-		}
-
-		if(!result) {
-			result = `require("${value}")`;
 		}
 	}
 	else
@@ -1271,7 +1199,7 @@ function compile_ExportDefaultDeclaration(node)
 {
 	const decl = node.decl;
 
-	let result = "module.exports = ";
+	let result = `modules[${context.currSourceFile.id}] = `;
 
 	if(decl instanceof AST.Binary) {
 		 result += doCompileLookup(decl.right);
