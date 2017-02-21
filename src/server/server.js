@@ -13,97 +13,124 @@ let indexFilename = "index.html";
 let onReadyFunc = null;
 let numToLoad = 2;
 
-function start(httpPort, wsPort, onReady)
+const start = function(httpPort, wsPort, onReady)
 {
-	onReadyFunc = onReady;
-	
-	startHttpServer(httpPort);
-	startWsServer(wsPort);
+	onReadyFunc = onReady
+
+	startHttpServer(httpPort)
+	tryStartWsServer(wsPort)
 }
 
-function startHttpServer(port)
+const startHttpServer = function(port)
 {
-	function respond404(response) {
-		response.writeHeader(404, { "Content-Type": "text/plain" });  
-		response.write("404 Not Found\n");  
-		response.end();  	
+	const respond404 = function(response) {
+		response.writeHeader(404, { "Content-Type": "text/plain" })
+		response.write("404 Not Found\n")
+		response.end()
 	}
 
-	httpServer = http.createServer((request, response) => 
+	httpServer = http.createServer((request, response) =>
 	{
-		const uri = url.parse(request.url).pathname;
-		let filename = path.join(process.cwd(), uri);
+		const uri = url.parse(request.url).pathname
+		let filename = path.join(process.cwd(), uri)
 
-		fs.exists(filename, (exists) => 
+		fs.exists(filename, (exists) =>
 		{
 			if(!exists) {
-				respond404(response);
-				return;
+				respond404(response)
+				return
 			}
 
 			if(fs.statSync(filename).isDirectory()) {
-				filename = path.join(filename, indexFilename);
+				filename = path.join(filename, indexFilename)
 			}
 
-			fs.readFile(filename, "binary", function(error, file) 
-			{  
-				if(error) {  
-					response.writeHeader(500, { "Content-Type": "text/plain" });  
-					response.write(error + "\n");  
-					response.end();  	
-					return;
-				}  
+			fs.readFile(filename, "binary", function(error, file)
+			{
+				if(error) {
+					response.writeHeader(500, { "Content-Type": "text/plain" })
+					response.write(error + "\n")
+					response.end()
+					return
+				}
 
-				response.writeHead(200, { "Content-Type": mime(filename) });
-				response.write(file, "binary");  
-				response.end();
+				response.writeHead(200, { "Content-Type": mime(filename) })
+				response.write(file, "binary")
+				response.end()
 			});
 		});
 	});
 
-	httpServer.on("listening", () => 
+	httpServer.on("listening", () =>
 	{
-		httpServerPort = httpServer.address().port;
-		
+		httpServerPort = httpServer.address().port
+
 		numToLoad--;
 		if(numToLoad === 0 && onReadyFunc) {
 			onReadyFunc();
 		}
 	});
 
-	httpServer.listen(port || 0);	
+	httpServer.listen(port || 0);
 }
 
-function startWsServer(port) 
+const tryStartWsServer = function(port)
 {
-	wsServer = new WebSocketServer({ port: 8080 });
-	wsServer.on("listening", () => {
-		numToLoad--;
-		if(numToLoad === 0 && onReadyFunc) {
-			onReadyFunc();
-		}
-	});
+	if(!port) {
+		getRandomPort((port) => {
+			startWsServer(port)
+		})
+	}
+	else {
+		startWsServer(port)
+	}
 }
 
-function reload() 
+const startWsServer = function(port)
+{
+	wsServerPort = port
+
+	wsServer = new WebSocketServer({ port })
+	wsServer.on("listening", () => {
+		numToLoad--
+		if(numToLoad === 0 && onReadyFunc) {
+			onReadyFunc()
+		}
+	})
+}
+
+const reload = function()
 {
 	wsServer.clients.forEach((client) => {
-		client.send(JSON.stringify({ type: "reload" }));
-	});
+		client.send(JSON.stringify({ type: "reload" }))
+	})
 }
 
-function getHttpPort() { 
-	return httpServerPort; 
+const getHttpPort = function() {
+	return httpServerPort
 }
 
-function getWsPort() {
-	return wsServerPort;
+const getWsPort = function() {
+	return wsServerPort
 }
 
-function setIndexFilename(filename) {
+const setIndexFilename = function(filename) {
 	indexFilename = filename;
+}
+
+const getRandomPort = function(onDone)
+{
+	const tempServer = http.createServer()
+
+	tempServer.on("listening", () => {
+		const port = tempServer.address().port
+		tempServer.close()
+		onDone(port)
+	})
+
+	tempServer.listen(0)
 }
 
 module.exports = {
 	start, reload, getHttpPort, getWsPort, setIndexFilename
-};
+}

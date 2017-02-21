@@ -381,8 +381,14 @@ class Export
 class ExportDefaultDeclaration
 {
 	constructor(decl) {
-		this.type = "ExportDefaultDeclaration";
-		this.decl = decl;
+		this.decl = decl
+	}
+}
+
+class ExportAllDeclaration
+{
+	constructor(source) {
+		this.source = source
 	}
 }
 
@@ -501,5 +507,6 @@ module.exports = {
 	ExportDefaultDeclaration,
 	Property,
 	ObjectPattern,
-	AssignmentPattern
-};
+	AssignmentPattern,
+	ExportAllDeclaration
+}

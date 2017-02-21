@@ -566,7 +566,7 @@ function parse_ForStatement(node)
 	const init = doLookup(node.init);
 	const test = doLookup(node.test);
 	const update = doLookup(node.update);
-	const body = parse_BlockStatement(node.body);
+	const body = doLookup(node.body);
 
 	const forExpr = new AST.For(init, test, update, body);
 	return forExpr;
@@ -576,7 +576,7 @@ function parse_ForInStatement(node)
 {
 	const left = doLookup(node.left);
 	const right = doLookup(node.right);
-	const body = parse_BlockStatement(node.body);
+	const body = doLookup(node.body);
 
 	const forInExpr = new AST.ForIn(left, right, body);
 	return forInExpr;
@@ -644,7 +644,14 @@ function parse_CatchClause(node)
 function parse_ImportDeclaration(node, exported)
 {
 	const source = doLookup(node.source);
-	const specifiers = exported ? parse_ExportSpecifiers(node.specifiers) : parse_ImportSpecifiers(node.specifiers);
+	
+	let specifiers
+	if(node.specifiers) {
+		specifiers = exported ? parse_ExportSpecifiers(node.specifiers) : parse_ImportSpecifiers(node.specifiers);
+	}
+	else {
+		specifiers = null
+	}
 
 	const moduleName = source.value;
 
@@ -795,6 +802,13 @@ function parse_ExportDefaultDeclaration(node)
 	return exportDefaultDecl;
 }
 
+const parse_ExportAllDeclaration = (node) => {
+	return parse_ImportDeclaration(node, true)
+	// const source = doLookup(node.source)
+	// const exportAllDeclaration = new AST.ExportAllDeclaration(source)
+	// return exportAllDeclaration
+}
+
 function parse_Super(node)
 {
 	const superNode = new AST.Super();
@@ -930,7 +944,8 @@ const lookup = {
 	ExportDefaultDeclaration: parse_ExportDefaultDeclaration,
 	ObjectPattern: parse_ObjectPattern,
 	Property: parse_Property,
-	AssignmentPattern: parse_AssignmentPattern
+	AssignmentPattern: parse_AssignmentPattern,
+	ExportAllDeclaration: parse_ExportAllDeclaration
 };
 
 module.exports = {

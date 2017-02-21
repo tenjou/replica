@@ -155,15 +155,12 @@ function compileContent(file, needModule)
 			result += `"use strict";\n\n`;
 		}
 
-		let relativePath = path.relative(process.cwd(), file.fullPath).replace(/\\/g,"/");
-		if(relativePath[0] !== ".") {
-			relativePath = "./" + relativePath;
-		}
-		relativePath = relativePath.toLowerCase();
+		const relativePath = path.relative(process.cwd(), file.fullPath).replace(/\\/g,"/");
 
 		result += `(function() `;
 		result += compile_Block(file.blockNode, compileSourceExports);
-		result += ")();"
+		result += ")();\n\n"
+		result += `//# sourceURL=${relativePath}`
 
 		decTabs();
 	}
@@ -885,16 +882,16 @@ function compile_Import(node)
 			const local = specifiers.local ? compile_Identifier(specifier.local) : localAs
 			
 			if(specifier.isDefault) {
-				result = `const ${local} = ${moduleExportsFile}`
+				result = `var ${local} = ${moduleExportsFile}`
 			}
 			else {
-				result = `const ${local} = ${moduleExportsFile}.${localAs}`
+				result = `var ${local} = ${moduleExportsFile}.${localAs}`
 			}
 		}
 		else
 		{
 			const filename = `__module${node.sourceFile.id}`
-			result = `const ${filename} = ${moduleExportsFile}`
+			result = `var ${filename} = ${moduleExportsFile}`
 
 			for(let n = 0; n < numSpecifiers; n++)
 			{
@@ -902,11 +899,11 @@ function compile_Import(node)
 				const local = compile_Identifier(specifier.local)
 				
 				if(specifier.isDefault) {
-					result += `;\n${tabs}const ${local} = ${filename}`
+					result += `;\n${tabs}var ${local} = ${filename}`
 				}
 				else {
 					const localAs = specifier.localAs ? compile_Identifier(specifier.localAs) : local
-					result += `;\n${tabs}const ${localAs} = ${filename}.${local}`
+					result += `;\n${tabs}var ${localAs} = ${filename}.${local}`
 				}
 			}
 		}
@@ -1213,6 +1210,10 @@ function compile_ExportDefaultDeclaration(node)
 	return result;
 }
 
+const compile_ExportAllDeclaration = (node) => {
+	
+}
+
 const compile_ObjectPattern = (node) =>
 {
 	let result = "{ "
@@ -1299,6 +1300,7 @@ const compileLookup = {
 	TemplateLiteral: compile_TemplateLiteral,
 	EmptyStatement: compile_EmptyStatement,
 	ExportDefaultDeclaration: compile_ExportDefaultDeclaration,
+	ExportAllDeclaration: compile_ExportAllDeclaration,
 	ObjectPattern: compile_ObjectPattern,
 	AssignmentPattern: compile_AssignmentPattern
 }

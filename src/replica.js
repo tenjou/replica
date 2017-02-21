@@ -126,7 +126,7 @@ class IndexFile
 			}
 
 			if(cli.flags.server) {
-				content += `<script>window.REPLICA_SERVER_PORT = ${server.getHttpPort()};</script>\n`;
+				content += `<script>window.REPLICA_SERVER_PORT = ${server.getWsPort()};</script>\n`;
 				content += `<script src="${src}replica.js"></script>\n`;
 			}			
 		}
@@ -520,11 +520,11 @@ console.log();
 
 // console.log(process.argv);
 
-// process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
-//   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'src/main.js',
-//   '-i',
-//   'index.html' ];
+process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
+  'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
+  'src/index.js',
+  '-i',
+  'index.html', '-s' ];
 
 cli.name(package.name)
    .version(package.version)
