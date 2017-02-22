@@ -188,7 +188,7 @@ function Scope() {
 
 function parse_Text(text)
 {
-	text = "\"" + text.replace(/\r\n|\r|\n/g, "\\\n") + "\"";
+	text = "\"" + text.replace(/\r\n|\r|\n/g, "\\n\\\n").replace(/"/g, "\\\"") + "\"";
 
 	const textNode = new AST.String(null, text);
 	const exportDefaultDecl = new AST.ExportDefaultDeclaration(textNode);
