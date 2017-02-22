@@ -54,12 +54,20 @@ function genRequirementResult(modulesPath)
 
 		a.prototype = proto;
 		a.prototype.constructor = a;
+		a.__parent = b;
 
 		if(b.__inherit === undefined) {
 			b.__inherit = {};
 		}
 
 		b.__inherit[a.name] = a;
+
+		var parent = b.__parent;
+		while(parent)
+		{
+			parent.__inherit[a.name] = a;
+			parent = parent.__parent;
+		}
 	}
 })(window || global);\n\n`;
 }
