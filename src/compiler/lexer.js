@@ -15,7 +15,8 @@ const nodeModulesPath = process.cwd() + "/node_modules/";
 
 const acornCfg = {
 	ecmaVersion: 6,
-	sourceType: "module"
+	sourceType: "module",
+	allowImportExportEverywhere: true
 };
 
 const customModules = {};
