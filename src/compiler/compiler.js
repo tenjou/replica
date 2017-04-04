@@ -30,11 +30,18 @@ function genRequirementResult(modulesPath)
 	scope.modules = {};
 	scope.modulesCached = {};
 	scope.modulesPath = ${modulesPath};
-	scope.process = {
-		env: {
-			NODE_ENV: "dev"
+	
+	if(scope.process) {
+		scope.process.env = { NODE_ENV: "dev" }
+	}
+	else 
+	{
+		scope.process = {
+			env: {
+				NODE_ENV: "dev"
+			}
 		}
-	};
+	}
 
 	scope._inherits = function(a, b)
 	{
