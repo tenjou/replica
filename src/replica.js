@@ -499,7 +499,7 @@ function start()
 
 	if(cli.flags.watch) 
 	{
-		if(cli.flags.server) {
+		if(cli.flags.server && !cli.flags.silent) {
 			const serverAddress = `http://127.0.0.1:${server.getHttpPort()}`;
 			utils.logMagenta("ServerOpened", serverAddress);
 			childProcess.spawn("explorer", [ serverAddress ]);
@@ -537,6 +537,7 @@ cli.name(package.name)
    .option("-s, --server [httpPort] [wsPort]", "Launch development server, activates --watch")
    .option("-b, --build <dir>", "Specify build directory", setBuildDir)
    .option("-l, --library <dir> [name]", "Add custom library", addLibrary)
+   .option("-si, --silent", "Silent mode")
    .command("make <dir> [template]", "Create and prepare an empty project", makeProject)
    .command("v", "\tPrints current version", printVersion)
    .parse(process.argv, run);
