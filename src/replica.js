@@ -3,7 +3,7 @@ const os = require("os");
 const fs = require("fs");
 const path = require("path");
 const childProcess = require("child_process");
-const uglifyJS = require("uglify-js");
+const uglifyJS = require("uglify-es");
 const watcher = require("./watcher");
 const lexer = require("./compiler/lexer");
 const server = require("./server/server");
@@ -231,7 +231,6 @@ function uglifyContent(content)
 	try 
 	{
 		result = uglifyJS.minify(content, { 
-			fromString: true,
 			compress: { 
 				dead_code: true
 			},
@@ -522,9 +521,9 @@ console.log();
 
 // process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
 //   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'index.js',
+//   'src/index.js',
 //   '-i',
-//   'index.html'];
+//   'index.html', "-s", "-u", "-si"];
 
 cli.name(package.name)
    .version(package.version)

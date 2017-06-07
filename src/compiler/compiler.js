@@ -455,7 +455,9 @@ function compile_Binary(node)
 {
 	let result;
 
-	if(node.left.type === "Binary") {
+	if(node.left instanceof AST.Binary ||
+	   node.left instanceof AST.Conditional) 
+	{
 		result = "(" + doCompileLookup(node.left) + ")";
 	}
 	else {
@@ -464,7 +466,9 @@ function compile_Binary(node)
 
 	result += " " + node.op + " ";
 
-	if(node.right.type === "Binary") {
+	if(node.right instanceof AST.Binary ||
+	   node.right instanceof AST.Conditional) 
+	{
 		result += "(" + doCompileLookup(node.right) + ")";
 	}
 	else {
