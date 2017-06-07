@@ -687,14 +687,18 @@ function compile_Conditional(node)
 
 function compile_Unary(node)
 {
-	let arg = doCompileLookup(node.arg);
-	if(node.arg.type === "Binary" || node.op === "void") {
-		arg = "(" + arg + ")";
+	let arg = doCompileLookup(node.arg)
+
+	if(node.arg instanceof AST.Binary || 
+	   node.arg instanceof AST.LogicalExpression || 
+	   node.op === "void") 
+	{
+		arg = "(" + arg + ")"
 	}
 
-	let op = node.op;
+	let op = node.op
 	if(op === "typeof" || op === "delete") {
-		op += " ";
+		op += " "
 	}
 
 	let result;
@@ -778,7 +782,8 @@ function compile_SwitchCase(node)
 }
 
 function compile_Break(node) {
-	return "break";
+	const output = node.label ? `break ${compile_Identifier(node.label)}` : "break"
+	return output;
 }
 
 function compile_For(node)
@@ -853,12 +858,16 @@ function compile_Sequence(node)
 
 function compile_Try(node)
 {
-	let result = "try " +
-		compile_Block(node.block) +
-		"\n" + tabs + "catch(" + doCompileLookup(node.handler.param) + ") " +
-		compile_Block(node.handler.body);
+	let result = "try " + compile_Block(node.block)
 
-	return result;
+	if(node.handler) {
+		result += "\n" + tabs + "catch(" + doCompileLookup(node.handler.param) + ") " + compile_Block(node.handler.body)
+	}
+	if(node.finalizer) {
+		result += "\n" + tabs + "finally " + compile_Block(node.finalizer)
+	}	
+
+	return result
 }
 
 function compile_Throw(node)
@@ -1101,28 +1110,33 @@ function compile_ThisExpression(node) {
 
 function compile_LogicalExpression(node)
 {
-	let left = doCompileLookup(node.left);
-	let right = doCompileLookup(node.right);
+	let left = doCompileLookup(node.left)
+	let right = doCompileLookup(node.right)
 
-	let result;
+	let result
 
-	if(node.left instanceof AST.Binary)
+	if(node.left instanceof AST.Binary ||
+	   node.left instanceof AST.LogicalExpression)
 	{
-		if(node.right instanceof AST.Binary) {
-			result = `(${left}) ${node.op} (${right})`;
+		if(node.right instanceof AST.Binary ||
+		   node.right instanceof AST.LogicalExpression) 
+		{
+			result = `(${left}) ${node.op} (${right})`
 		}
 		else {
-			result = `(${left}) ${node.op} ${right}`;
+			result = `(${left}) ${node.op} ${right}`
 		}
 	}
-	else if(node.right instanceof AST.Binary) {
-		result = `${left} ${node.op} (${right})`;
+	else if(node.right instanceof AST.Binary ||
+		    node.right instanceof AST.LogicalExpression) 
+	{
+		result = `${left} ${node.op} (${right})`
 	}
 	else {
-		result = `${left} ${node.op} ${right}`;
+		result = `${left} ${node.op} ${right}`
 	}
 
-	return result;
+	return result
 }
 
 function compile_ArrowFunctionExpression(node)

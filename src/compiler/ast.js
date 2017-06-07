@@ -259,8 +259,9 @@ class SwitchCase
 
 class Break
 {
-	constructor() {
-		this.type = "Break";
+	constructor(label) {
+		this.type = "Break"
+		this.label = label
 	}
 }
 
@@ -329,10 +330,11 @@ class Sequence
 
 class Try
 {
-	constructor(block, handler) {
-		this.type = "Try";
-		this.block = block;
-		this.handler = handler;
+	constructor(block, handler, finalizer) {
+		this.type = "Try"
+		this.block = block
+		this.handler = handler
+		this.finalizer = finalizer
 	}
 }
 

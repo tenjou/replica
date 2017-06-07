@@ -558,7 +558,9 @@ function parse_Consequent(consequent)
 
 function parse_BreakStatement(node)
 {
-	const breakExpr = new AST.Break();
+	const label = node.label ? parse_Identifier(node.label) : null
+
+	const breakExpr = new AST.Break(label)
 	return breakExpr;
 }
 
@@ -610,7 +612,7 @@ function parse_ContinueStatement(node)
 function parse_LabeledStatement(node)
 {
 	const label = doLookup(node.label);
-	const body = parse_BlockStatement(node.body);
+	const body = doLookup(node.body);
 
 	const labeledStatement = new AST.Label(label, body);
 	return labeledStatement;
@@ -618,11 +620,12 @@ function parse_LabeledStatement(node)
 
 function parse_TryStatement(node)
 {
-	const block = parse_BlockStatement(node.block);
-	const handler = parse_CatchClause(node.handler);
+	const block = parse_BlockStatement(node.block)
+	const handler = node.handler ? parse_CatchClause(node.handler) : null
+	const finalizer = node.finalizer ? parse_BlockStatement(node.finalizer) : null
 
-	const tryStatement = new AST.Try(block, handler);
-	return tryStatement;
+	const tryStatement = new AST.Try(block, handler, finalizer)
+	return tryStatement
 }
 
 function parse_ThrowStatement(node)
