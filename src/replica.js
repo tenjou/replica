@@ -519,11 +519,11 @@ console.log();
 
 // console.log(process.argv);
 
-// process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
-//   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'src/index.js',
-//   '-i',
-//   'index.html', "-s", "-u", "-si"];
+process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
+  'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
+  'index.js',
+  '-i',
+  'index.html'];
 
 cli.name(package.name)
    .version(package.version)

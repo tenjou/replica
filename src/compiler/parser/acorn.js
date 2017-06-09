@@ -1,3 +1,258 @@
+const AST = require("../ast")
+const { ValueType } = require("../types")
+const { reservedWords } = require("./identifier")
+
+let context = null
+let tokenTypes = null
+
+const Identifier = function(liberal) 
+{
+	const node = startNode(AST.Identifier)
+
+	if(liberal && context.options.allowReserved == "never") {
+		liberal = false
+	}
+
+	if(context.type === tokenTypes.name) 
+	{
+		if(!liberal && (!context.options.allowReserved && context.isReservedWord(context.value) || context.strict && reservedWords.strict(context.value) && 
+		(context.input.slice(this.start, this.end).indexOf("\\") == -1))) {
+			context.raise(this.start, `The keyword '${this.value}' is reserved`)
+		}
+		node.value = context.value
+	} 
+	else if(liberal && context.type.keyword) {
+		node.value = context.type.keyword
+	} 
+	else {
+		context.unexpected()
+	}
+
+	next()
+	return finishNode(node)
+}
+
+const VariableDeclaration = function(node, kind) 
+{
+	next()
+
+	node.kind = kind.keyword
+
+	Variable(node, false)
+	semicolon()
+
+	return finishNode(node)
+}
+
+const Variable = function(node, isFor)
+{
+	node.decls = []
+
+	for(;;) 
+	{
+		const decl = startNode(AST.Variable)
+		parseVarId(decl)
+
+		if(eat(tokenTypes.colon)) 
+		{
+			if(context.type === tokenTypes.name) {
+				decl.valueType = ValueType[context.value]
+				next()
+			}
+			else {
+				context.raise(context.lastTokEnd, "Invalid variable type defined")
+			}
+		}
+		
+		if(eat(tokenTypes.eq)) {
+			decl.expr = context.parseMaybeAssign(isFor)
+		} 
+		else if(kind === tokenTypes._const && !(context.type === tokenTypes._in || context.isContextual("of"))) {
+			context.unexpected()
+		} 
+		else if(decl.id.type != "Identifier" && !(isFor && (context.type === _tokentype.types._in || context.isContextual("of")))) {
+			context.raise(context.lastTokEnd, "Complex binding patterns require an initialization value")
+		} 
+		else {
+			decl.expr = null
+		}
+
+		node.decls.push(finishNode(decl))
+
+		if(!eat(tokenTypes.comma)) {
+			break
+		}
+	}
+
+	return node
+}
+
+const ExpressionOp = function(left, leftStartPos, leftStartLoc, minPrec, noIn) 
+{
+	const prec = context.type.binop
+	if(prec != null && (!noIn || context.type !== tokenTypes._in)) 
+	{
+		if(prec > minPrec) 
+		{
+			const op = context.type
+			const cls = (op === tokenTypes.logicalOR || op === tokenTypes.logicalAND) ? AST.LogicalExpression : AST.BinaryExpression
+			const node = startNodeAt(cls, leftStartPos, leftStartLoc)
+			node.left = left
+			node.op = context.value
+			
+			next()
+			node.right = ExpressionOp(context.parseMaybeUnary(), context.start, context.startLoc, prec, noIn)
+			finishNode(node)
+			return ExpressionOp(node, leftStartPos, leftStartLoc, minPrec, noIn)
+		}
+	}
+
+	return left
+}
+
+const parseVarId = function(decl) {
+	decl.id = parseBindingAtom()
+	checkLVal(decl.id, true)
+}
+
+const checkLVal = function(expr, isBinding, checkClashes) 
+{
+	switch(expr.type) 
+	{
+		case "Identifier":
+		{
+			if(context.strict && (reservedWords.strictBind(expr.value) || reservedWords.strict(expr.value))) {
+				context.raise(expr.start, (isBinding ? "Binding " : "Assigning to ") + `${expr.name} in strict mode`)
+			}
+			if(checkClashes) 
+			{
+				if(has(checkClashes, expr.name)) { 
+					context.raise(expr.start, "Argument name clash in strict mode")
+				}
+				checkClashes[expr.name] = true
+			}
+		} break
+
+		case "MemberExpression":
+		{
+			if(isBinding) {
+				context.raise(expr.start, (isBinding ? "Binding" : "Assigning to") + " member expression")
+			}
+		} break
+
+		case "ObjectPattern":
+		{
+			for(let n = 0; n < expr.properties.length; n++) {
+				checkLVal(expr.properties[n].value, isBinding, checkClashes)
+			}
+		} break
+
+		case "ArrayPattern":
+		{
+			for(let n = 0; n < expr.elements.length; n++) {
+				const element = expr.elements[i]
+				if(element) {
+					checkLVal(element, isBinding, checkClashes)
+				}
+			}
+		} break
+
+		case "AssignmentPattern":
+			checkLVal(expr.left, isBinding, checkClashes)
+			break
+
+		case "RestElement":
+			checkLVal(expr.argument, isBinding, checkClashes)
+			break
+
+		case "ParenthesizedExpression":
+			checkLVal(expr.expression, isBinding, checkClashes)
+			break
+
+		default:
+			context.raise(expr.start, (isBinding ? "Binding" : "Assigning to") + " rvalue")
+			break
+	}
+};
+
+const parseBindingAtom = function() 
+{
+	switch(context.type) 
+	{
+		case tokenTypes.name:
+			return Identifier()
+
+		case tokenTypes.bracketL:
+			const node = startNode(AST.ArrayPattern)
+			context.next()
+			node.elements = context.parseBindingList(tokenTypes.bracketR, true, true)
+			return finishNode(node)
+
+		case tokenTypes.braceL:
+			return context.parseObj(true)
+
+		default:
+			context.unexpected()
+	}
+}
+
+const has = function(obj, propName) {
+	return Object.prototype.hasOwnProperty.call(obj, propName)
+}
+
+const eat = function(type) 
+{
+	if(context.type === type) {
+		next()
+		return true
+	} 
+	
+	return false
+}
+
+const next = function() 
+{
+	if(context.options.onToken) {
+		context.options.onToken(new Token(context))
+	}
+
+	context.lastTokEnd = context.end
+	context.lastTokStart = context.start
+	context.lastTokEndLoc = context.endLoc
+	context.lastTokStartLoc = context.startLoc
+	context.nextToken()
+}
+
+const semicolon = function() 
+{
+	if(!eat(tokenTypes.semi) && !context.insertSemicolon())  {
+		context.unexpected()
+	}
+}
+
+const startNode = function(cls) {
+	const node = new cls()
+	node.start = context.start
+	node.end = context.end
+	return node
+}
+
+const startNodeAt = function(cls, pos, loc) {
+	const node = new cls()
+	node.start = pos
+	node.end = loc
+	return node
+}
+
+const finishNode = function(node) 
+{
+	node.end = context.lastTokEnd
+	if(context.options.locations) { 
+		node.loc.end = context.lastTokEndLoc 
+	}
+	return node
+};
+
 (function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.acorn = f()}})(function(){var define,module,exports;return (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(_dereq_,module,exports){
 // A recursive descent parser operates by defining functions for all
 // syntactic elements, and recursively calling those, each function
@@ -28,8 +283,6 @@ var _identifier = _dereq_("./identifier");
 var _util = _dereq_("./util");
 
 var pp = _state.Parser.prototype;
-
-const AST = require("./ast");
 
 // Check if property name clashes with already added.
 // Object/class getters and setters are not allowed to clash —
@@ -157,7 +410,7 @@ pp.parseExprOps = function (noIn, refShorthandDefaultPos) {
 			startLoc = this.startLoc;
 	var expr = this.parseMaybeUnary(refShorthandDefaultPos);
 	if (refShorthandDefaultPos && refShorthandDefaultPos.start) return expr;
-	return this.parseExprOp(expr, startPos, startLoc, -1, noIn);
+	return ExpressionOp(expr, startPos, startLoc, -1, noIn);
 };
 
 // Parse binary operators with the operator precedence parsing
@@ -966,7 +1219,9 @@ exports.version = version;
 // [api]: https://developer.mozilla.org/en-US/docs/SpiderMonkey/Parser_API
 
 function parse(input, options) {
-	return new _state.Parser(options, input).parse();
+	const parser = new _state.Parser(options, input)
+	context = parser
+	return parser.parse()
 }
 
 // This function tries to parse a single expression at a given
@@ -1743,10 +1998,15 @@ pp.parseStatement = function (declaration, topLevel) {
 			return this.parseThrowStatement(node);
 		case _tokentype.types._try:
 			return this.parseTryStatement(node);
-		case _tokentype.types._let:case _tokentype.types._const:
+
+		case _tokentype.types._let:
+		case _tokentype.types._const:
 			if (!declaration) this.unexpected(); // NOTE: falls through to _var
-		case _tokentype.types._var:
-			return this.parseVarStatement(node, starttype);
+		case _tokentype.types._var: {
+			const node = startNode(AST.VariableDeclaration)
+			return VariableDeclaration(node, starttype)
+		}
+
 		case _tokentype.types._while:
 			return this.parseWhileStatement(node);
 		case _tokentype.types._with:
@@ -1944,13 +2204,6 @@ pp.parseTryStatement = function (node) {
 	return this.finishNode(node, "TryStatement");
 };
 
-pp.parseVarStatement = function (node, kind) {
-	this.next();
-	this.parseVar(node, false, kind);
-	this.semicolon();
-	return this.finishNode(node, "VariableDeclaration");
-};
-
 pp.parseWhileStatement = function (node) {
 	this.next();
 	node.test = this.parseParenExpression();
@@ -2052,12 +2305,27 @@ pp.parseForIn = function (node, init) {
 
 // Parse a list of variable declarations.
 
-pp.parseVar = function (node, isFor, kind) {
-	node.declarations = [];
-	node.kind = kind.keyword;
-	for (;;) {
-		var decl = this.startNode();
+pp.parseVar = function (node, isFor, kind) 
+{
+	node.declarations = []
+	node.kind = kind.keyword
+
+	for(;;) 
+	{
+		const decl = this.startNode();
 		this.parseVarId(decl);
+
+		if(this.eat(_tokentype.types.colon)) 
+		{
+			if(this.type === _tokentype.types.name) {
+				decl.valueType = this.value
+				this.next()
+			}
+			else {
+				this.raise(this.lastTokEnd, "Invalid variable type defined")
+			}
+		}
+		
 		if (this.eat(_tokentype.types.eq)) {
 			decl.init = this.parseMaybeAssign(isFor);
 		} else if (kind === _tokentype.types._const && !(this.type === _tokentype.types._in || this.options.ecmaVersion >= 6 && this.isContextual("of"))) {
@@ -3250,6 +3518,7 @@ var types = {
 	slash: binop("/", 10)
 };
 
+tokenTypes = types
 exports.types = types;
 // Map keyword names to token types.
 

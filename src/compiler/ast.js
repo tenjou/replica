@@ -1,25 +1,21 @@
-
-// const Flag = {
-// 	UNKNOWN: 0 << 1,
-// 	EXPORTED: 1 << 1,
-// 	DEFAULT: 2 << 1
-// };
+const { ValueType } = require("./types")
 
 class Identifier
 {
-	constructor(value) {
-		this.type = "Identifier";
-		this.value = value;
+	constructor() {
+		this.type = "Identifier"
+		this.value = null
 	}
 }
 
 class Number
 {
 	constructor(value) {
-		this.type = "Number";
-		this.value = value;
-		this.start = 0;
-		this.end = 0;		
+		this.type = "Number"
+		this.valueType = ValueType.Number
+		this.value = value
+		this.start = 0
+		this.end = 0
 	}
 }
 
@@ -36,11 +32,12 @@ class Bool
 class String
 {
 	constructor(value, raw) {
-		this.type = "String";
-		this.value = value;
-		this.raw = raw;
-		this.start = 0;
-		this.end = 0;
+		this.type = "String"
+		this.value = value
+		this.valueType = ValueType.String
+		this.raw = raw
+		this.start = 0
+		this.end = 0
 	}
 }
 
@@ -56,20 +53,29 @@ class Name
 
 class Variable
 {
-	constructor(value, expr, kind) {
-		this.type = "Variable";
-		this.value = value;
-		this.expr = expr;
-		this.kind = kind || null;
+	constructor() 
+	{
+		this.type = "Variable"
+		this.start = 0
+		this.end = 0
+
+		this.id = null
+		this.valueType = ValueType.Dynamic
+		this.expr = null
+		this.kind = null
 	}
 }
 
 class VariableDeclaration
 {
-	constructor(decls, kind) {
-		this.type = "VariableDeclaration";
-		this.decls = decls;
-		this.kind = kind;
+	constructor() 
+	{
+		this.type = "VariableDeclaration"
+		this.start = 0
+		this.end = 0
+
+		this.decls = null
+		this.kind = null
 	}
 }
 
@@ -95,16 +101,6 @@ class Call
 		this.type = "Call";
 		this.value = value;
 		this.args = args;
-	}
-}
-
-class Binary
-{
-	constructor(left, right, op) {
-		this.type = "Binary";
-		this.left = left;
-		this.right = right;
-		this.op = op;
 	}
 }
 
@@ -394,14 +390,23 @@ class ExportAllDeclaration
 	}
 }
 
+class BinaryExpression
+{
+	constructor(left, right, op) {
+		this.type = "BinaryExpression"
+		this.left = left
+		this.right = right
+		this.op = op
+	}
+}
+
 class LogicalExpression 
 {
-	constructor(left, right, op)
-	{
-		this.type = "LogicalExpression";
-		this.left = left;
-		this.right = right;
-		this.op = op;
+	constructor(left, right, op) {
+		this.type = "LogicalExpression"
+		this.left = left
+		this.right = right
+		this.op = op
 	}
 }
 
@@ -471,7 +476,6 @@ module.exports = {
 	Array,
 	Object,
 	Call,
-	Binary,
 	Update,
 	New,
 	Null,
@@ -502,6 +506,7 @@ module.exports = {
 	Import,
 	Specifier,
 	Export,
+	BinaryExpression,
 	LogicalExpression,
 	ArrowFunctionExpression,
 	TemplateLiteral,

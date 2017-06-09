@@ -1,4 +1,5 @@
 const AST = require("./ast.js")
+const { ValueTypeStr } = require("./types")
 const path = require("path")
 const utils = require("./utils")
 const logger = require("../logger")
@@ -372,10 +373,10 @@ function compile_VariableDeclaration(node)
 
 function compile_VariableNode(node)
 {
-	const declName = doCompileLookup(node.value);
+	const declName = doCompileLookup(node.id)
 
 	if(node.expr) {
-		let result = declName + " = " + doCompileLookup(node.expr);
+		let result = `${declName}/*:${ValueTypeStr[node.expr.valueType]}*/ = ${doCompileLookup(node.expr)}`
 		return result;
 	}
 

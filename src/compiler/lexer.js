@@ -1,8 +1,10 @@
 const fs = require("fs");
 const path = require("path");
-const acorn = require("./acorn.js");
+const acorn = require("./parser/acorn.js");
 const AST = require("./ast.js");
 const compiler = require("./compiler.js");
+const resolver = require("./resolver/resolver")
+const optimizer = require("./optimizer/optimizer")
 const logger = require("../logger");
 
 const ctx = {
@@ -145,26 +147,33 @@ function parseAll(filePath)
 
 function compile(sourceFile, needModule)
 {
+	resolver.run(sourceFile)
+	optimizer.run(sourceFile)
+
 	const result = compiler.compile(sourceFile, {
 		type: "content",
 		transpiling: true,
 		needModule: needModule,
 		modules
-	});
-	return result;
+	})
+
+	return result
 }
 
 function compileAll(sourceFile)
 {
+	resolver.run(sourceFile)
+	optimizer.run(sourceFile)
+
 	const result = compiler.compile(sourceFile, {
 		type: "content",
 		concat: true,
 		transpiling: true,
 		needModule: true,
 		modules
-	});
+	})
 
-	return result;
+	return result
 }
 
 function getImports(sourceFile)
@@ -184,7 +193,8 @@ function getImports(sourceFile)
 }
 
 function Scope() {
-	this.body = [];
+	this.body = []
+	this.vars = {}
 }
 
 function parse_Text(text)
@@ -398,26 +408,21 @@ function parse_ThisExpression(node)
 	return thisExpr;
 }
 
-function parse_VariableDeclaration(node)
-{
-	const decls = node.declarations;
-	const vars = new Array(decls.length);
-
-	for(let n = 0; n < decls.length; n++) {
-		vars[n] = parse_VariableDeclarator(decls[n]);
-	}
-
-	const varDecl = new AST.VariableDeclaration(vars, node.kind);
-	return varDecl;
+function parse_VariableDeclaration(node) {
+	return node
 }
 
 function parse_VariableDeclarator(node)
 {
-	const id = doLookup(node.id);
-	const init = doLookup(node.init);
+	const id = doLookup(node.id)
+	const init = doLookup(node.init)
 
-	const varDecl = new AST.Variable(id, init);
-	return varDecl;
+	const varDecl = new AST.Variable(id, init)
+	if(node.valueType) {
+		varDecl.valueType = AST.ValueType[node.valueType]
+	}
+	
+	return varDecl
 }
 
 function parse_Args(nodes)
