@@ -1,11 +1,11 @@
 const AST = require("../AST")
-const { ValueTypeStr } = require("../types")
+const { ValueType, ValueTypeStr } = require("../types")
 const logger = require("../../logger")
 
 let activeScope = null
 
 const run = function(file) {
-	parse.Block(file.blockNode)
+	parse.BlockDeclaration(file.blockNode)
 }
 
 const parse =
@@ -18,13 +18,20 @@ const parse =
 		return node.valueType
 	},
 
-	Identifier(node) {
+	Identifier(node) 
+	{
 		const variable = activeScope.vars[node.value]
-		return variable.valueType
+		if(!variable) {
+			logger.logError("IdentifierError:", `‘${node.value}’ was not declared in this scope`)
+			return 0
+		}
+		
+		return ValueType.valueType
 	},
 
-	Block(node)
+	BlockDeclaration(node)
 	{
+		const prevScope = activeScope
 		activeScope = node.scope
 
 		const body = node.scope.body
@@ -32,25 +39,20 @@ const parse =
 			const bodyNode = body[n]
 			parse[bodyNode.type](bodyNode)
 		}
+
+		activeScope = prevScope
 	},
 
 	Variable(node) 
 	{
 		const exprValueType = parse[node.expr.type](node.expr)
 
-		if(node.valueType !== exprValueType) {
+		if(node.valueType && node.valueType !== exprValueType) {
 			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[node.valueType]}' to '${ValueTypeStr[exprValueType]}'`)
 			return
 		}
 
-		const scopeVar = activeScope.vars[node.id.value]
-		if(scopeVar && scopeVar.valueType && scopeVar.valueType !== nodeValueType) {
-			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[node.valueType]}' to '${ValueTypeStr[exprValueType]}'`)
-			return
-		}
-		else {
-			node.valueType = nodeValueType
-		}
+		node.valueType = exprValueType
 	},
 
 	VariableDeclaration(node)
@@ -63,20 +65,60 @@ const parse =
 		}
 	},
 
-	BinaryExpression(node)
+	AssignmentExpression(node) 
 	{
 		const leftType = parse[node.left.type](node.left)
 		const rightType = parse[node.right.type](node.right)
 
-		if(leftType === AST.ValueType.STRING || rightType === AST.ValueType.STRING) {
-			node.valueType = AST.ValueType.STRING
+		if(leftType && leftType !== rightType) {
+			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[leftType]}' to '${ValueTypeStr[rightType]}'`)
+			return
 		}
 		else {
 			node.valueType = leftType
 		}
 
 		return node.valueType
+	},
+
+	BinaryExpression(node) 
+	{
+		const leftType = parse[node.left.type](node.left)
+		const rightType = parse[node.right.type](node.right)
+
+		if(leftType === ValueType.String || rightType === ValueType.String) {
+			node.valueType = ValueType.String
+		}
+		else {
+			node.valueType = leftType
+		}
+
+		return node.valueType
+	},
+
+	FunctionDeclaration(node) 
+	{
+		const scopeNode = activeScope.vars[node.id.value]
+		if(scopeNode) {
+			logger.logError("Error", `redeclaration of ${node.id.value}:${node.typeValue}`)
+			return
+		}
+
+		activeScope.vars[node.id.value] = node
+
+		parse.BlockDeclaration(node.body)
 	}
+}
+
+const getName = function(node)
+{
+	switch(node.type)
+	{
+		case "Identifier":
+			return node.value
+	}
+
+	return null
 }
 
 module.exports = {

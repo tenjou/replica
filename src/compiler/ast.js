@@ -1,5 +1,10 @@
 const { ValueType } = require("./types")
 
+function Scope() {
+	this.body = []
+	this.vars = {}
+}
+
 class Identifier
 {
 	constructor() {
@@ -132,13 +137,16 @@ class Null
 	}
 }
 
-class Function
+class FunctionDeclaration
 {
-	constructor(id, params, body) {
-		this.type = "Function";
-		this.id = id;
-		this.params = params;
-		this.body = body;
+	constructor() {
+		this.type = "FunctionDeclaration"
+		this.valueType = ValueType.Function
+		this.id = null
+		this.params = null
+		this.body = null
+		this.generator = false
+		this.expression = false
 	}
 }
 
@@ -174,26 +182,28 @@ class MethodDef
 class ThisExpression
 {
 	constructor() {
-		this.type = "ThisExpression";
-		this.start = 0;
-		this.end = 0;		
+		this.type = "ThisExpression"
+		this.start = 0
+		this.end = 0		
 	}
 }
 
 class Super
 {
 	constructor() {
-		this.type = "Super";
-		this.start = 0;
-		this.end = 0;
+		this.type = "Super"
+		this.start = 0
+		this.end = 0
 	}
 }
 
-class Block
+class BlockStatement
 {
-	constructor(scope) {
-		this.type = "Block";
-		this.scope = scope;
+	constructor() {
+		this.type = "BlockStatement"
+		this.start = 0
+		this.end = 0
+		this.scope = new Scope()
 	}
 }
 
@@ -390,6 +400,16 @@ class ExportAllDeclaration
 	}
 }
 
+class AssignmentExpression 
+{
+	constructor(left, right, op) {
+		this.type = "AssignmentExpression"
+		this.left = left
+		this.right = right
+		this.op = op
+	}
+}
+
 class BinaryExpression
 {
 	constructor(left, right, op) {
@@ -466,6 +486,7 @@ class AssignmentPattern
 }
 
 module.exports = {
+	Scope,
 	Identifier,
 	Number,
 	Bool,
@@ -479,13 +500,13 @@ module.exports = {
 	Update,
 	New,
 	Null,
-	Function,
+	FunctionDeclaration,
 	Class,
 	ClassBody,
 	MethodDef,
 	ThisExpression,
 	Super,
-	Block,
+	BlockStatement,
 	Return,
 	If,
 	Conditional,
@@ -506,6 +527,7 @@ module.exports = {
 	Import,
 	Specifier,
 	Export,
+	AssignmentExpression,
 	BinaryExpression,
 	LogicalExpression,
 	ArrowFunctionExpression,

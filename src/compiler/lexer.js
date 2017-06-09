@@ -93,7 +93,9 @@ class SourceFile
 				ctx.currSourceFile = this;
 
 				this.clear();
-				this.blockNode = parse_BlockStatement(node);
+				node.scope = new AST.Scope()
+				this.blockNode = node
+				parse_Body(node.body, node.scope)
 
 				ctx.currSourceFile = prevSourceFile;
 			} break;
@@ -192,11 +194,6 @@ function getImports(sourceFile)
 	return imports;
 }
 
-function Scope() {
-	this.body = []
-	this.vars = {}
-}
-
 function parse_Text(text)
 {
 	text = "\"" + text.replace(/\r\n|\r|\n/g, "\\n\\\n").replace(/"/g, "\\\"") + "\"";
@@ -233,7 +230,7 @@ function parse_JSON(text)
 }
 
 function parse_Identifier(node) {
-	return new AST.Identifier(node.name);
+	return node
 }
 
 function dontParse(node) {
@@ -279,13 +276,8 @@ function parse_UpdateExpression(node)
 	return updateExpr;
 }
 
-function parse_AssignmentExpression(node)
-{
-	const left = doLookup(node.left);
-	const right = doLookup(node.right);
-
-	const binaryExpr = new AST.Binary(left, right, node.operator);
-	return binaryExpr;
+function parse_AssignmentExpression(node) {
+	return node
 }
 
 function parse_ArrayExpression(node)
@@ -439,14 +431,8 @@ function parse_Args(nodes)
 	return args;
 }
 
-function parse_FunctionDeclaration(node)
-{
-	const id = doLookup(node.id);
-	const params = parse_Args(node.params);
-	const body = doLookup(node.body);
-
-	const funcDecl = new AST.Function(id, params, body);
-	return funcDecl;
+function parse_FunctionDeclaration(node) {
+	return node
 }
 
 function parse_ClassDeclaration(node)
@@ -485,14 +471,11 @@ function parse_MethodDefinition(node)
 
 function parse_BlockStatement(node)
 {
-	if(!node) { return null; }
+	if(!node) { return null }
 
-	const scope = new Scope();
+	parse_Body(node.body, node.scope)
 
-	parse_Body(node.body, scope);
-
-	const blockExpr = new AST.Block(scope);
-	return blockExpr;
+	return node
 }
 
 function parse_Body(body, scope)

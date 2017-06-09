@@ -5,114 +5,317 @@ const { reservedWords } = require("./identifier")
 let context = null
 let tokenTypes = null
 
-const Identifier = function(liberal) 
+const parse =
 {
-	const node = startNode(AST.Identifier)
-
-	if(liberal && context.options.allowReserved == "never") {
-		liberal = false
-	}
-
-	if(context.type === tokenTypes.name) 
+	Identifier(liberal) 
 	{
-		if(!liberal && (!context.options.allowReserved && context.isReservedWord(context.value) || context.strict && reservedWords.strict(context.value) && 
-		(context.input.slice(this.start, this.end).indexOf("\\") == -1))) {
-			context.raise(this.start, `The keyword '${this.value}' is reserved`)
+		const node = startNode(AST.Identifier)
+
+		if(liberal && context.options.allowReserved == "never") {
+			liberal = false
 		}
-		node.value = context.value
-	} 
-	else if(liberal && context.type.keyword) {
-		node.value = context.type.keyword
-	} 
-	else {
-		context.unexpected()
-	}
 
-	next()
-	return finishNode(node)
-}
-
-const VariableDeclaration = function(node, kind) 
-{
-	next()
-
-	node.kind = kind.keyword
-
-	Variable(node, false)
-	semicolon()
-
-	return finishNode(node)
-}
-
-const Variable = function(node, isFor)
-{
-	node.decls = []
-
-	for(;;) 
-	{
-		const decl = startNode(AST.Variable)
-		parseVarId(decl)
-
-		if(eat(tokenTypes.colon)) 
+		if(context.type === tokenTypes.name) 
 		{
-			if(context.type === tokenTypes.name) {
-				decl.valueType = ValueType[context.value]
-				next()
+			if(!liberal && (!context.options.allowReserved && context.isReservedWord(context.value) || context.strict && reservedWords.strict(context.value) && 
+			(context.input.slice(this.start, this.end).indexOf("\\") == -1))) {
+				context.raise(this.start, `The keyword '${this.value}' is reserved`)
 			}
-			else {
-				context.raise(context.lastTokEnd, "Invalid variable type defined")
-			}
-		}
-		
-		if(eat(tokenTypes.eq)) {
-			decl.expr = context.parseMaybeAssign(isFor)
+			node.value = context.value
 		} 
-		else if(kind === tokenTypes._const && !(context.type === tokenTypes._in || context.isContextual("of"))) {
-			context.unexpected()
-		} 
-		else if(decl.id.type != "Identifier" && !(isFor && (context.type === _tokentype.types._in || context.isContextual("of")))) {
-			context.raise(context.lastTokEnd, "Complex binding patterns require an initialization value")
+		else if(liberal && context.type.keyword) {
+			node.value = context.type.keyword
 		} 
 		else {
-			decl.expr = null
+			context.unexpected()
 		}
 
-		node.decls.push(finishNode(decl))
+		next()
+		return finishNode(node)
+	},
 
-		if(!eat(tokenTypes.comma)) {
-			break
-		}
-	}
-
-	return node
-}
-
-const ExpressionOp = function(left, leftStartPos, leftStartLoc, minPrec, noIn) 
-{
-	const prec = context.type.binop
-	if(prec != null && (!noIn || context.type !== tokenTypes._in)) 
+	Block(allowStrict) 
 	{
-		if(prec > minPrec) 
-		{
-			const op = context.type
-			const cls = (op === tokenTypes.logicalOR || op === tokenTypes.logicalAND) ? AST.LogicalExpression : AST.BinaryExpression
-			const node = startNodeAt(cls, leftStartPos, leftStartLoc)
-			node.left = left
-			node.op = context.value
-			
-			next()
-			node.right = ExpressionOp(context.parseMaybeUnary(), context.start, context.startLoc, prec, noIn)
-			finishNode(node)
-			return ExpressionOp(node, leftStartPos, leftStartLoc, minPrec, noIn)
+		const node = startNode(AST.BlockStatement)
+		node.body = []
+		
+		expect(tokenTypes.braceL)
+
+		while(!eat(tokenTypes.braceR)) {
+			const statementNode = context.parseStatement(true)
+			node.body.push(statementNode)
 		}
+
+		return finishNode(node)
+	},
+
+	VariableDeclaration(node, kind) 
+	{
+		next()
+
+		node.kind = kind.keyword
+
+		parse.Variable(node, false)
+		semicolon()
+
+		return finishNode(node)
+	},
+
+	Variable(node, isFor)
+	{
+		node.decls = []
+
+		for(;;) 
+		{
+			const decl = startNode(AST.Variable)
+			parse.VarId(decl)
+
+			if(eat(tokenTypes.colon)) 
+			{
+				if(context.type === tokenTypes.name) {
+					decl.valueType = ValueType[context.value]
+					next()
+				}
+				else {
+					context.raise(context.lastTokEnd, "Invalid variable type defined")
+				}
+			}
+			
+			if(eat(tokenTypes.eq)) {
+				decl.expr = parse.Assign(isFor, null, false)
+			} 
+			else if(kind === tokenTypes._const && !(context.type === tokenTypes._in || context.isContextual("of"))) {
+				unexpected()
+			} 
+			else if(decl.id.type != "Identifier" && !(isFor && (context.type === _tokentype.types._in || context.isContextual("of")))) {
+				context.raise(context.lastTokEnd, "Complex binding patterns require an initialization value")
+			} 
+			else {
+				decl.expr = null
+			}
+
+			node.decls.push(finishNode(decl))
+
+			if(!eat(tokenTypes.comma)) {
+				break
+			}
+		}
+
+		return node
+	},
+
+	ExpressionOp(left, leftStartPos, leftStartLoc, minPrec, noIn) 
+	{
+		const prec = context.type.binop
+		if(prec != null && (!noIn || context.type !== tokenTypes._in)) 
+		{
+			if(prec > minPrec) 
+			{
+				const op = context.type
+				const cls = (op === tokenTypes.logicalOR || op === tokenTypes.logicalAND) ? AST.LogicalExpression : AST.BinaryExpression
+				const node = startNodeAt(cls, leftStartPos, leftStartLoc)
+				node.left = left
+				node.op = context.value
+				
+				next()
+				node.right = parse.ExpressionOp(parse.Unary(), context.start, context.startLoc, prec, noIn)
+				finishNode(node)
+				return parse.ExpressionOp(node, leftStartPos, leftStartLoc, minPrec, noIn)
+			}
+		}
+
+		return left
+	},
+
+	Unary(refShorthandDefaultPos) 
+	{
+		if(context.type.prefix) 
+		{
+			var node = this.startNode(),
+					update = this.type === _tokentype.types.incDec;
+			node.operator = this.value;
+			node.prefix = true
+
+			next()
+
+			node.argument = parse.Unary()
+			if (refShorthandDefaultPos && refShorthandDefaultPos.start) this.unexpected(refShorthandDefaultPos.start);
+			if(update) {
+				checkLVal(node.argument)
+			}
+			else if(node.operator === "delete" && node.argument.type === "Identifier") {
+				context.raise(node.start, "Deleting local variable in strict mode")
+			}
+
+			return this.finishNode(node, update ? "UpdateExpression" : "UnaryExpression");
+		}
+
+		const startPos = context.start
+		const startLoc = context.startLoc
+		const expr = context.parseExprSubscripts(refShorthandDefaultPos)
+
+		if(refShorthandDefaultPos && refShorthandDefaultPos.start) {
+			return expr
+		}
+
+		while(context.type.postfix && !this.canInsertSemicolon()) 
+		{
+			var node = this.startNodeAt(startPos, startLoc);
+			node.operator = this.value;
+			node.prefix = false;
+			node.argument = expr;
+			this.checkLVal(expr);
+			this.next();
+			expr = this.finishNode(node, "UpdateExpression");
+		}
+
+		return expr
+	},
+
+	Assign(noIn, refShorthandDefaultPos, afterLeftParse) 
+	{
+		if(context.type === tokenTypes._yield && context.inGenerator) { 
+			return context.parseYield()
+		}
+
+		let failOnShorthandAssign = false
+		if(!refShorthandDefaultPos) {
+			refShorthandDefaultPos = { start: 0 }
+			failOnShorthandAssign = true
+		} 
+		else {
+			failOnShorthandAssign = false
+		}
+
+		const startPos = context.start
+		const startLoc = context.startLoc
+
+		if(context.type == tokenTypes.parenL || context.type == tokenTypes.name) {
+			context.potentialArrowAt = context.start
+		}
+
+		const left = context.parseMaybeConditional(noIn, refShorthandDefaultPos)
+
+		if(afterLeftParse) {
+			left = afterLeftParse.call(context, left, startPos, startLoc)
+		}
+
+		if(context.type.isAssign) 
+		{
+			const node = startNodeAt(AST.AssignmentExpression, startPos, startLoc)
+			node.operator = context.value
+			node.left = (context.type === tokenTypes.eq) ? context.toAssignable(left) : left
+			refShorthandDefaultPos.start = 0
+
+			checkLVal(left)
+			next()
+
+			node.right = parse.Assign(noIn, false, false)
+			return finishNode(node)
+		} 
+		else if(failOnShorthandAssign && refShorthandDefaultPos.start) {
+			unexpected(refShorthandDefaultPos.start)
+		}
+
+		return left
+	},
+
+	VarId(decl) {
+		decl.id = parse.BindingAtom()
+		checkLVal(decl.id, true)
+	},
+
+	BindingAtom() 
+	{
+		switch(context.type) 
+		{
+			case tokenTypes.name:
+				return parse.Identifier()
+
+			case tokenTypes.bracketL:
+				const node = startNode(AST.ArrayPattern)
+				context.next()
+				node.elements = context.parseBindingList(tokenTypes.bracketR, true, true)
+				return finishNode(node)
+
+			case tokenTypes.braceL:
+				return context.parseObj(true)
+
+			default:
+				context.unexpected()
+				break
+		}
+	},
+
+	Function(isStatement, allowExpressionBody)
+	{
+		let node
+
+		if(isStatement) {
+			node = startNode(AST.FunctionDeclaration)
+			node.generator = eat(tokenTypes.star)
+
+			if(context.type === tokenTypes.name) {
+				node.id = parse.Identifier()
+			}
+		}
+		else {
+			node = startNode(AST.FunctionExpression)
+			node.generator = eat(tokenTypes.star)
+		}
+
+		parse.FunctionParams(node)
+		parse.FunctionBody(node, allowExpressionBody)
+		return finishNode(node)
+	},
+
+	FunctionParams(node) {
+		expect(tokenTypes.parenL)
+		node.params = context.parseBindingList(tokenTypes.parenR, false, false)
+	},
+
+	FunctionBody(node, allowExpression) 
+	{
+		const isExpression = allowExpression && context.type !== tokenTypes.braceL
+
+		if(isExpression) {
+			node.body = context.parseMaybeAssign()
+			node.expression = true
+		} 
+		else 
+		{
+			const prevInFunc = context.inFunction
+			const prevInGen = context.inGenerator
+			const prevLabels = context.labels
+			context.inFunction = true
+			context.inGenerator = node.generator
+			context.labels = []
+
+			node.body = parse.Block(true)
+			node.expression = false
+
+			context.inFunction = prevInFunc
+			context.inGenerator = prevInGen
+			context.labels = prevLabels
+		}
+
+		if(!isExpression) 
+		{
+			const nameHash = {}
+			if(node.id) {
+				checkLVal(node.id, true, false)
+			}
+
+			for(let n = 0; n < node.params.length; n++) {
+				checkLVal(node.params[i], true, nameHash)
+			}
+		}
+	},
+
+	FunctionStatement() {
+		next()
+		return parse.Function(true, false)
 	}
-
-	return left
-}
-
-const parseVarId = function(decl) {
-	decl.id = parseBindingAtom()
-	checkLVal(decl.id, true)
 }
 
 const checkLVal = function(expr, isBinding, checkClashes) 
@@ -173,27 +376,6 @@ const checkLVal = function(expr, isBinding, checkClashes)
 			context.raise(expr.start, (isBinding ? "Binding" : "Assigning to") + " rvalue")
 			break
 	}
-};
-
-const parseBindingAtom = function() 
-{
-	switch(context.type) 
-	{
-		case tokenTypes.name:
-			return Identifier()
-
-		case tokenTypes.bracketL:
-			const node = startNode(AST.ArrayPattern)
-			context.next()
-			node.elements = context.parseBindingList(tokenTypes.bracketR, true, true)
-			return finishNode(node)
-
-		case tokenTypes.braceL:
-			return context.parseObj(true)
-
-		default:
-			context.unexpected()
-	}
 }
 
 const has = function(obj, propName) {
@@ -208,6 +390,14 @@ const eat = function(type)
 	} 
 	
 	return false
+}
+
+const expect = function(type) {
+	eat(type) || unexpected()
+}
+
+const unexpected = function(pos) {
+	context.raise(pos !== null ? pos : context.start, "Unexpected token")
 }
 
 const next = function() 
@@ -342,7 +532,7 @@ pp.checkPropClash = function (prop, propHash) {
 pp.parseExpression = function (noIn, refShorthandDefaultPos) {
 	var startPos = this.start,
 			startLoc = this.startLoc;
-	var expr = this.parseMaybeAssign(noIn, refShorthandDefaultPos);
+	var expr = parse.Assign(noIn, refShorthandDefaultPos, false)
 	if (this.type === _tokentype.types.comma) {
 		var node = this.startNodeAt(startPos, startLoc);
 		node.expressions = [expr];
@@ -355,35 +545,7 @@ pp.parseExpression = function (noIn, refShorthandDefaultPos) {
 // Parse an assignment expression. This includes applications of
 // operators like `+=`.
 
-pp.parseMaybeAssign = function (noIn, refShorthandDefaultPos, afterLeftParse) {
-	if (this.type == _tokentype.types._yield && this.inGenerator) return this.parseYield();
 
-	var failOnShorthandAssign = undefined;
-	if (!refShorthandDefaultPos) {
-		refShorthandDefaultPos = { start: 0 };
-		failOnShorthandAssign = true;
-	} else {
-		failOnShorthandAssign = false;
-	}
-	var startPos = this.start,
-			startLoc = this.startLoc;
-	if (this.type == _tokentype.types.parenL || this.type == _tokentype.types.name) this.potentialArrowAt = this.start;
-	var left = this.parseMaybeConditional(noIn, refShorthandDefaultPos);
-	if (afterLeftParse) left = afterLeftParse.call(this, left, startPos, startLoc);
-	if (this.type.isAssign) {
-		var node = this.startNodeAt(startPos, startLoc);
-		node.operator = this.value;
-		node.left = this.type === _tokentype.types.eq ? this.toAssignable(left) : left;
-		refShorthandDefaultPos.start = 0; // reset because shorthand default was used correctly
-		this.checkLVal(left);
-		this.next();
-		node.right = this.parseMaybeAssign(noIn);
-		return this.finishNode(node, "AssignmentExpression");
-	} else if (failOnShorthandAssign && refShorthandDefaultPos.start) {
-		this.unexpected(refShorthandDefaultPos.start);
-	}
-	return left;
-};
 
 // Parse a ternary conditional (`?:`) operator.
 
@@ -408,9 +570,9 @@ pp.parseMaybeConditional = function (noIn, refShorthandDefaultPos) {
 pp.parseExprOps = function (noIn, refShorthandDefaultPos) {
 	var startPos = this.start,
 			startLoc = this.startLoc;
-	var expr = this.parseMaybeUnary(refShorthandDefaultPos);
+	var expr = parse.Unary(refShorthandDefaultPos);
 	if (refShorthandDefaultPos && refShorthandDefaultPos.start) return expr;
-	return ExpressionOp(expr, startPos, startLoc, -1, noIn);
+	return parse.ExpressionOp(expr, startPos, startLoc, -1, noIn);
 };
 
 // Parse binary operators with the operator precedence parsing
@@ -438,35 +600,6 @@ pp.parseExprOp = function (left, leftStartPos, leftStartLoc, minPrec, noIn) {
 	return left;
 };
 
-// Parse unary operators, both prefix and postfix.
-
-pp.parseMaybeUnary = function (refShorthandDefaultPos) {
-	if (this.type.prefix) {
-		var node = this.startNode(),
-				update = this.type === _tokentype.types.incDec;
-		node.operator = this.value;
-		node.prefix = true;
-		this.next();
-		node.argument = this.parseMaybeUnary();
-		if (refShorthandDefaultPos && refShorthandDefaultPos.start) this.unexpected(refShorthandDefaultPos.start);
-		if (update) this.checkLVal(node.argument);else if (this.strict && node.operator === "delete" && node.argument.type === "Identifier") this.raise(node.start, "Deleting local variable in strict mode");
-		return this.finishNode(node, update ? "UpdateExpression" : "UnaryExpression");
-	}
-	var startPos = this.start,
-			startLoc = this.startLoc;
-	var expr = this.parseExprSubscripts(refShorthandDefaultPos);
-	if (refShorthandDefaultPos && refShorthandDefaultPos.start) return expr;
-	while (this.type.postfix && !this.canInsertSemicolon()) {
-		var node = this.startNodeAt(startPos, startLoc);
-		node.operator = this.value;
-		node.prefix = false;
-		node.argument = expr;
-		this.checkLVal(expr);
-		this.next();
-		expr = this.finishNode(node, "UpdateExpression");
-	}
-	return expr;
-};
 
 // Parse call, dot, and `[]`-subscript expressions.
 
@@ -529,12 +662,18 @@ pp.parseExprAtom = function (refShorthandDefaultPos) {
 		case _tokentype.types._yield:
 			if (this.inGenerator) this.unexpected();
 
-		case _tokentype.types.name:
-			var startPos = this.start,
-					startLoc = this.startLoc;
-			var id = this.parseIdent(this.type !== _tokentype.types.name);
-			if (canBeArrow && !this.canInsertSemicolon() && this.eat(_tokentype.types.arrow)) return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), [id]);
-			return id;
+		case tokenTypes.name:
+		{
+			const startPos = this.start
+			const startLoc = this.startLoc
+			const id = parse.Identifier(this.type !== tokenTypes.name)
+
+			if(canBeArrow && !this.canInsertSemicolon() && this.eat(tokenTypes.arrow))  {
+				return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), [id])
+			}
+
+			return id
+		}
 
 		case _tokentype.types.regexp:
 			var value = this.value;
@@ -838,16 +977,6 @@ pp.parsePropertyName = function (prop) {
 	return prop.key = this.type === _tokentype.types.num || this.type === _tokentype.types.string ? this.parseExprAtom() : this.parseIdent(true);
 };
 
-// Initialize empty function node.
-
-pp.initFunction = function (node) {
-	node.id = null;
-	if (this.options.ecmaVersion >= 6) {
-		node.generator = false;
-		node.expression = false;
-	}
-};
-
 // Parse object or class method.
 
 pp.parseMethod = function (isGenerator) {
@@ -872,39 +1001,6 @@ pp.parseArrowExpression = function (node, params) {
 	return this.finishNode(node, "ArrowFunctionExpression");
 };
 
-// Parse function body and check parameters.
-
-pp.parseFunctionBody = function (node, allowExpression) {
-	var isExpression = allowExpression && this.type !== _tokentype.types.braceL;
-
-	if (isExpression) {
-		node.body = this.parseMaybeAssign();
-		node.expression = true;
-	} else {
-		// Start a new scope with regard to labels and the `inFunction`
-		// flag (restore them to their old value afterwards).
-		var oldInFunc = this.inFunction,
-				oldInGen = this.inGenerator,
-				oldLabels = this.labels;
-		this.inFunction = true;this.inGenerator = node.generator;this.labels = [];
-		node.body = this.parseBlock(true);
-		node.expression = false;
-		this.inFunction = oldInFunc;this.inGenerator = oldInGen;this.labels = oldLabels;
-	}
-
-	// If this is a strict mode function, verify that argument names
-	// are not repeated, and it does not try to bind the words `eval`
-	// or `arguments`.
-	if (this.strict || !isExpression && node.body.body.length && this.isUseStrict(node.body.body[0])) {
-		var nameHash = {},
-				oldStrict = this.strict;
-		this.strict = true;
-		if (node.id) this.checkLVal(node.id, true);
-		for (var i = 0; i < node.params.length; i++) {
-			this.checkLVal(node.params[i], true, nameHash);
-		}this.strict = oldStrict;
-	}
-};
 
 // Parses a comma-separated list of expressions, and returns them as
 // an array. `close` is the token type that ends the list, and
@@ -1982,9 +2078,12 @@ pp.parseStatement = function (declaration, topLevel) {
 			return this.parseDoStatement(node);
 		case _tokentype.types._for:
 			return this.parseForStatement(node);
-		case _tokentype.types._function:
-			if (!declaration && this.options.ecmaVersion >= 6) this.unexpected();
-			return this.parseFunctionStatement(node);
+
+		case tokenTypes._function: {
+			if(!declaration) { this.unexpected() }
+			return parse.FunctionStatement()
+		}
+
 		case _tokentype.types._class:
 			if (!declaration) this.unexpected();
 			return this.parseClass(node, true);
@@ -1999,12 +2098,12 @@ pp.parseStatement = function (declaration, topLevel) {
 		case _tokentype.types._try:
 			return this.parseTryStatement(node);
 
-		case _tokentype.types._let:
-		case _tokentype.types._const:
-			if (!declaration) this.unexpected(); // NOTE: falls through to _var
-		case _tokentype.types._var: {
+		case tokenTypes._let:
+		case tokenTypes._const:
+			if(!declaration) { unexpected() }
+		case tokenTypes._var: {
 			const node = startNode(AST.VariableDeclaration)
-			return VariableDeclaration(node, starttype)
+			return parse.VariableDeclaration(node, starttype)
 		}
 
 		case _tokentype.types._while:
@@ -2250,28 +2349,6 @@ pp.parseExpressionStatement = function (node, expr) {
 	return this.finishNode(node, "ExpressionStatement");
 };
 
-// Parse a semicolon-enclosed block of statements, handling `"use
-// strict"` declarations when `allowStrict` is true (used for
-// function bodies).
-
-pp.parseBlock = function (allowStrict) {
-	var node = this.startNode(),
-			first = true,
-			oldStrict = undefined;
-	node.body = [];
-	this.expect(_tokentype.types.braceL);
-	while (!this.eat(_tokentype.types.braceR)) {
-		var stmt = this.parseStatement(true);
-		node.body.push(stmt);
-		if (first && allowStrict && this.isUseStrict(stmt)) {
-			oldStrict = this.strict;
-			this.setStrict(this.strict = true);
-		}
-		first = false;
-	}
-	if (oldStrict === false) this.setStrict(false);
-	return this.finishNode(node, "BlockStatement");
-};
 
 // Parse a regular `for` loop. The disambiguation code in
 // `parseStatement` will already have parsed the init statement or
@@ -2301,66 +2378,6 @@ pp.parseForIn = function (node, init) {
 	node.body = this.parseStatement(false);
 	this.labels.pop();
 	return this.finishNode(node, type);
-};
-
-// Parse a list of variable declarations.
-
-pp.parseVar = function (node, isFor, kind) 
-{
-	node.declarations = []
-	node.kind = kind.keyword
-
-	for(;;) 
-	{
-		const decl = this.startNode();
-		this.parseVarId(decl);
-
-		if(this.eat(_tokentype.types.colon)) 
-		{
-			if(this.type === _tokentype.types.name) {
-				decl.valueType = this.value
-				this.next()
-			}
-			else {
-				this.raise(this.lastTokEnd, "Invalid variable type defined")
-			}
-		}
-		
-		if (this.eat(_tokentype.types.eq)) {
-			decl.init = this.parseMaybeAssign(isFor);
-		} else if (kind === _tokentype.types._const && !(this.type === _tokentype.types._in || this.options.ecmaVersion >= 6 && this.isContextual("of"))) {
-			this.unexpected();
-		} else if (decl.id.type != "Identifier" && !(isFor && (this.type === _tokentype.types._in || this.isContextual("of")))) {
-			this.raise(this.lastTokEnd, "Complex binding patterns require an initialization value");
-		} else {
-			decl.init = null;
-		}
-		node.declarations.push(this.finishNode(decl, "VariableDeclarator"));
-		if (!this.eat(_tokentype.types.comma)) break;
-	}
-	return node;
-};
-
-pp.parseVarId = function (decl) {
-	decl.id = this.parseBindingAtom();
-	this.checkLVal(decl.id, true);
-};
-
-// Parse a function declaration or literal (depending on the
-// `isStatement` parameter).
-
-pp.parseFunction = function (node, isStatement, allowExpressionBody) {
-	this.initFunction(node);
-	if (this.options.ecmaVersion >= 6) node.generator = this.eat(_tokentype.types.star);
-	if (isStatement || this.type === _tokentype.types.name) node.id = this.parseIdent();
-	this.parseFunctionParams(node);
-	this.parseFunctionBody(node, allowExpressionBody);
-	return this.finishNode(node, isStatement ? "FunctionDeclaration" : "FunctionExpression");
-};
-
-pp.parseFunctionParams = function (node) {
-	this.expect(_tokentype.types.parenL);
-	node.params = this.parseBindingList(_tokentype.types.parenR, false, false);
 };
 
 // Parse a class declaration or literal (depending on the

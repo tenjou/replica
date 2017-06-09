@@ -26,58 +26,59 @@ const clsCtx = {
 
 function genRequirementResult(modulesPath)
 {
-	return `(function(scope) {
-	scope.module = { exports: {} };
-	scope.modules = {};
-	scope.modulesCached = {};
-	scope.modulesPath = ${modulesPath};
+	return ""
+// 	return `(function(scope) {
+// 	scope.module = { exports: {} };
+// 	scope.modules = {};
+// 	scope.modulesCached = {};
+// 	scope.modulesPath = ${modulesPath};
 	
-	if(scope.process) {
-		scope.process.env = { NODE_ENV: "dev" }
-	}
-	else 
-	{
-		scope.process = {
-			env: {
-				NODE_ENV: "dev"
-			}
-		}
-	}
+// 	if(scope.process) {
+// 		scope.process.env = { NODE_ENV: "dev" }
+// 	}
+// 	else 
+// 	{
+// 		scope.process = {
+// 			env: {
+// 				NODE_ENV: "dev"
+// 			}
+// 		}
+// 	}
 
-	scope._inherits = function(a, b)
-	{
-		var protoA = a.prototype;
-		var proto = Object.create(b.prototype);
+// 	scope._inherits = function(a, b)
+// 	{
+// 		var protoA = a.prototype;
+// 		var proto = Object.create(b.prototype);
 
-		for(var key in protoA)
-		{
-			var param = Object.getOwnPropertyDescriptor(protoA, key);
-			if(param.get || param.set) {
-				Object.defineProperty(proto, key, param);
-			}
-			else {
-				proto[key] = protoA[key];
-			}
-		}
+// 		for(var key in protoA)
+// 		{
+// 			var param = Object.getOwnPropertyDescriptor(protoA, key);
+// 			if(param.get || param.set) {
+// 				Object.defineProperty(proto, key, param);
+// 			}
+// 			else {
+// 				proto[key] = protoA[key];
+// 			}
+// 		}
 
-		a.prototype = proto;
-		a.prototype.constructor = a;
-		a.__parent = b;
+// 		a.prototype = proto;
+// 		a.prototype.constructor = a;
+// 		a.__parent = b;
 
-		if(b.__inherit === undefined) {
-			b.__inherit = {};
-		}
+// 		if(b.__inherit === undefined) {
+// 			b.__inherit = {};
+// 		}
 
-		b.__inherit[a.name] = a;
+// 		b.__inherit[a.name] = a;
 
-		var parent = b.__parent;
-		while(parent)
-		{
-			parent.__inherit[a.name] = a;
-			parent = parent.__parent;
-		}
-	}
-})(window || global);\n\n`;
+// 		var parent = b.__parent;
+// 		while(parent)
+// 		{
+// 			parent.__inherit[a.name] = a;
+// 			parent = parent.__parent;
+// 		}
+// 	}
+// })(window || global);\n\n`;
 }
 
 function genModulePaths()
@@ -376,11 +377,19 @@ function compile_VariableNode(node)
 	const declName = doCompileLookup(node.id)
 
 	if(node.expr) {
-		let result = `${declName}/*:${ValueTypeStr[node.expr.valueType]}*/ = ${doCompileLookup(node.expr)}`
+		const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${doCompileLookup(node.expr)}`
 		return result;
 	}
 
 	return declName;
+}
+
+const AssignmentExpression = function(node) 
+{
+	const declName = doCompileLookup(node.left)
+
+	const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${doCompileLookup(node.right)}`
+	return result	
 }
 
 function compile_Array(node)
@@ -1308,7 +1317,7 @@ const compileLookup = {
 	Update: compile_Update,
 	Call: compile_Call,
 	Block: compile_Block,
-	Function: compile_Function,
+	FunctionDeclaration: compile_Function,
 	Return: compile_Return,
 	If: compile_If,
 	Conditional: compile_Conditional,
@@ -1328,6 +1337,7 @@ const compileLookup = {
 	Export: compile_Export,
 	Class: compile_Class,
 	ThisExpression: compile_ThisExpression,
+	AssignmentExpression,
 	LogicalExpression: compile_LogicalExpression,
 	ArrowFunctionExpression: compile_ArrowFunctionExpression,
 	Super: compile_Super,

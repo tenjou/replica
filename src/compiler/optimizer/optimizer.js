@@ -1,10 +1,11 @@
 const AST = require("../AST")
+const { ValueType } = require("../types")
 const logger = require("../../logger")
 
 let activeScope = null
 
 const run = function(file) {
-	parse.Block(file.blockNode)
+	parse.BlockDeclaration(file.blockNode)
 }
 
 const parse = 
@@ -21,7 +22,7 @@ const parse =
 		return node
 	},
 
-	Block(node)
+	BlockDeclaration(node)
 	{
 		activeScope = node.scope
 
@@ -49,18 +50,34 @@ const parse =
 		return node
 	},
 
-	BinaryExpression(node)
+	Expression(node)
 	{
 		const leftNode = parse[node.left.type](node.left)
 		const rightNode = parse[node.right.type](node.right)
 
-		leftNode.value += rightNode.value
-		if(leftNode.type === "String") {
-			leftNode.raw = `"${leftNode.value}"`
+		if(rightNode.valueType === ValueType.String) {
+			rightNode.value = leftNode.value + rightNode.value
+			rightNode.raw = `"${rightNode.value}"`
+			return rightNode
 		}
-
+		
+		leftNode.value += rightNode.value
 		return leftNode
-	}		
+	},
+
+	AssignmentExpression(node) {
+		node.right = parse[node.right.type](node.right)
+		return node
+	},
+
+	BinaryExpression(node) {
+		return parse.Expression(node)
+	},
+
+	FunctionDeclaration(node) {
+		parse.BlockDeclaration(node.body)
+		return node
+	}	
 }
 
 module.exports = {

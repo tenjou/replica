@@ -12,6 +12,7 @@ const type = function(type) {
 type("Dynamic")
 type("Number")
 type("String")
+type("Function")
 
 module.exports = {
 	ValueType,
