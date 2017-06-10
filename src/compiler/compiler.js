@@ -465,7 +465,7 @@ function compile_Binary(node)
 {
 	let result;
 
-	if(node.left instanceof AST.Binary ||
+	if(node.left instanceof AST.BinaryExpression ||
 	   node.left instanceof AST.Conditional) 
 	{
 		result = "(" + doCompileLookup(node.left) + ")";
@@ -476,7 +476,7 @@ function compile_Binary(node)
 
 	result += " " + node.op + " ";
 
-	if(node.right instanceof AST.Binary ||
+	if(node.right instanceof AST.BinaryExpression ||
 	   node.right instanceof AST.Conditional) 
 	{
 		result += "(" + doCompileLookup(node.right) + ")";
@@ -1313,7 +1313,7 @@ const compileLookup = {
 	VariableDeclaration: compile_VariableDeclaration,
 	Array: compile_Array,
 	Object: compile_Object,
-	Binary: compile_Binary,
+	BinaryExpression: compile_Binary,
 	Update: compile_Update,
 	Call: compile_Call,
 	Block: compile_Block,

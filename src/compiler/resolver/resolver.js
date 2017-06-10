@@ -26,7 +26,7 @@ const parse =
 			return 0
 		}
 		
-		return ValueType.valueType
+		return variable.valueType
 	},
 
 	BlockDeclaration(node)
@@ -70,9 +70,9 @@ const parse =
 		const leftType = parse[node.left.type](node.left)
 		const rightType = parse[node.right.type](node.right)
 
-		if(leftType && leftType !== rightType) {
+		if(leftType && rightType && leftType !== rightType) {
 			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[leftType]}' to '${ValueTypeStr[rightType]}'`)
-			return
+			return node.valueType
 		}
 		else {
 			node.valueType = leftType
@@ -86,11 +86,23 @@ const parse =
 		const leftType = parse[node.left.type](node.left)
 		const rightType = parse[node.right.type](node.right)
 
-		if(leftType === ValueType.String || rightType === ValueType.String) {
-			node.valueType = ValueType.String
+		if(leftType && rightType && leftType !== rightType) 
+		{
+			if(leftType === ValueType.String || rightType === ValueType.String) {
+				node.valueType = ValueType.String
+			}
+			else {
+				logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[leftType]}' to '${ValueTypeStr[rightType]}'`)
+			}
 		}
-		else {
-			node.valueType = leftType
+		else 
+		{
+			if(leftType === ValueType.String || rightType === ValueType.String) {
+				node.valueType = ValueType.String
+			}
+			else {
+				node.valueType = leftType
+			}
 		}
 
 		return node.valueType

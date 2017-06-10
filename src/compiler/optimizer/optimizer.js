@@ -55,6 +55,29 @@ const parse =
 		const leftNode = parse[node.left.type](node.left)
 		const rightNode = parse[node.right.type](node.right)
 
+		if(leftNode.type === "BinaryExpression" && rightNode.simple && leftNode.right.simple) 
+		{
+			const leftRightNode = leftNode.right
+			if(leftRightNode.type === "String") {
+				leftRightNode.value += rightNode.value
+				leftRightNode.raw = `"${leftRightNode.value}"`
+			}
+			else if(rightNode.type === "String") {
+				rightNode.value = leftRightNode.value + rightNode.value
+				rightNode.raw = `"${rightNode.value}"`
+				leftNode.right = rightNode
+			}
+			else {
+				leftNode.value += rightNode.value
+			}
+			
+			return leftNode
+		} 
+
+		if(leftNode.type === "Identifier" || rightNode.type === "Identifier") {
+			return node
+		}
+
 		if(rightNode.valueType === ValueType.String) {
 			rightNode.value = leftNode.value + rightNode.value
 			rightNode.raw = `"${rightNode.value}"`

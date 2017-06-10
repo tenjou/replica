@@ -21,16 +21,19 @@ class Number
 		this.value = value
 		this.start = 0
 		this.end = 0
+		this.simple = true
 	}
 }
 
 class Bool
 {
 	constructor(value) {
-		this.type = "Bool";
-		this.value = value;
-		this.start = 0;
-		this.end = 0;
+		this.type = "Bool"
+		this.valueType = ValueType.Number
+		this.value = value
+		this.start = 0
+		this.end = 0
+		this.simple = true
 	}
 }
 
@@ -43,6 +46,7 @@ class String
 		this.raw = raw
 		this.start = 0
 		this.end = 0
+		this.simple = true
 	}
 }
 
