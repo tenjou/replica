@@ -388,7 +388,7 @@ const AssignmentExpression = function(node)
 {
 	const declName = doCompileLookup(node.left)
 
-	const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${doCompileLookup(node.right)}`
+	const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ ${node.operator} ${doCompileLookup(node.right)}`
 	return result	
 }
 
