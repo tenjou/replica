@@ -9,6 +9,7 @@ const type = function(type) {
 	freeTypeId++
 }
 
+type("None")
 type("Dynamic")
 type("Number")
 type("String")

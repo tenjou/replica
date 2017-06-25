@@ -3,6 +3,7 @@ const { ValueType } = require("./types")
 function Scope() {
 	this.body = []
 	this.vars = {}
+	this.parent = null
 }
 
 class Identifier
@@ -10,6 +11,7 @@ class Identifier
 	constructor() {
 		this.type = "Identifier"
 		this.value = null
+		this.valueType = ValueType.Number
 	}
 }
 
@@ -104,12 +106,16 @@ class Object
 	}
 }
 
-class Call
+class CallExpression
 {
-	constructor(value, args) {
-		this.type = "Call";
-		this.value = value;
-		this.args = args;
+	constructor() 
+	{
+		this.type = "CallExpression"
+		this.start = 0
+		this.end = 0
+
+		this.arguments = null
+		this.valueType = ValueType.None
 	}
 }
 
@@ -146,6 +152,7 @@ class FunctionDeclaration
 	constructor() {
 		this.type = "FunctionDeclaration"
 		this.valueType = ValueType.Function
+		this.returnType = ValueType.Dynamic
 		this.id = null
 		this.params = null
 		this.body = null
@@ -211,11 +218,13 @@ class BlockStatement
 	}
 }
 
-class Return
+class ReturnStatement
 {
-	constructor(arg) {
-		this.type = "Return";
-		this.arg = arg;
+	constructor() {
+		this.type = "ReturnStatement"
+		this.start = 0
+		this.end = 0
+		this.arg = null
 	}
 }
 
@@ -385,15 +394,25 @@ class Specifier
 
 class Export
 {
-	constructor(decl) {
-		this.decl = decl
+	constructor(declaration) 
+	{
+		this.type = "Export"
+		this.start = 0
+		this.end = 0
+
+		this.declaration = declaration
 	}
 }
 
 class ExportDefaultDeclaration
 {
-	constructor(decl) {
-		this.decl = decl
+	constructor(declaration) 
+	{
+		this.type = "ExportDefaultDeclaration"
+		this.start = 0
+		this.end = 0
+
+		this.declaration = declaration
 	}
 }
 
@@ -416,8 +435,13 @@ class AssignmentExpression
 
 class BinaryExpression
 {
-	constructor(left, right, op) {
+	constructor(left, right, op) 
+	{
 		this.type = "BinaryExpression"
+		this.start = 0
+		this.end = 0	
+
+		this.valueType = ValueType.Dynamic
 		this.left = left
 		this.right = right
 		this.op = op
@@ -500,7 +524,7 @@ module.exports = {
 	VariableDeclaration,
 	Array,
 	Object,
-	Call,
+	CallExpression,
 	Update,
 	New,
 	Null,
@@ -511,7 +535,7 @@ module.exports = {
 	ThisExpression,
 	Super,
 	BlockStatement,
-	Return,
+	ReturnStatement,
 	If,
 	Conditional,
 	Unary,

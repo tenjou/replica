@@ -80,6 +80,7 @@ class SourceFile
 		switch(this.extname)
 		{
 			case ".js":
+			case ".ts":
 			{
 				let node = null;
 				try {
@@ -92,9 +93,9 @@ class SourceFile
 				const prevSourceFile = ctx.currSourceFile;
 				ctx.currSourceFile = this;
 
-				this.clear();
-				node.scope = new AST.Scope()
+				this.clear()
 				this.blockNode = node
+				
 				parse_Body(node.body, node.scope)
 
 				ctx.currSourceFile = prevSourceFile;
@@ -147,13 +148,14 @@ function parseAll(filePath)
 	return sourceFile;
 }
 
-function compile(sourceFile, needModule)
+function compile(sourceFile, needModule, target)
 {
 	resolver.run(sourceFile)
 	optimizer.run(sourceFile)
 
 	const result = compiler.compile(sourceFile, {
 		type: "content",
+		target,
 		transpiling: true,
 		needModule: needModule,
 		modules
@@ -162,13 +164,14 @@ function compile(sourceFile, needModule)
 	return result
 }
 
-function compileAll(sourceFile)
+function compileAll(sourceFile, target)
 {
 	resolver.run(sourceFile)
 	optimizer.run(sourceFile)
 
 	const result = compiler.compile(sourceFile, {
 		type: "content",
+		target,
 		concat: true,
 		transpiling: true,
 		needModule: true,

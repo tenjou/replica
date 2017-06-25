@@ -245,6 +245,8 @@ function uglifyContent(content)
 	return result ? result.code : 0;
 }
 
+const target = "wast"
+
 function updateTick()
 {
 	if(needUpdate.files)
@@ -275,7 +277,7 @@ function updateTick()
 				file.update();
 
 				if(file.blockNode && !cli.flags.concat) {
-					fs.writeFileSync(buildSrc + file.filename + "." + file.id + ".js", lexer.compile(file, (file === firstImportFile)), "utf8");
+					fs.writeFileSync(`${buildSrc}${file.filename}.${file.id}.${target}`, lexer.compile(file, (file === firstImportFile), target), "utf8")
 				}
 
 				contentChanged = true;
@@ -521,7 +523,7 @@ console.log();
 
 process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-  'index.js',
+  'index.ts',
   '-i',
   'index.html'];
 

@@ -97,10 +97,33 @@ const parse =
 		return parse.Expression(node)
 	},
 
+	IfStatement(node)
+	{
+		parse[node.test.type](node.test)
+		parse.BlockDeclaration(node.consequent)
+		return node
+	},
+
 	FunctionDeclaration(node) {
 		parse.BlockDeclaration(node.body)
 		return node
-	}	
+	},
+
+	ReturnStatement(node) 
+	{
+		if(node.arg) {
+			node.arg = parse[node.arg.type](node.arg)
+		}
+		return node
+	},
+	
+	CallExpression(node) {
+		return node
+	},
+
+	ExportDefaultDeclaration(node) {
+		return node
+	}
 }
 
 module.exports = {
