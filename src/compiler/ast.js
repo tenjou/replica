@@ -4,6 +4,8 @@ function Scope() {
 	this.body = []
 	this.vars = {}
 	this.parent = null
+	this.labelIndex = 0
+	this.tmpIndex = 0
 }
 
 class Identifier
@@ -119,13 +121,18 @@ class CallExpression
 	}
 }
 
-class Update
+class UpdateExpression
 {
-	constructor(arg, op, prefix) {
-		this.type = "Update";
-		this.arg = arg;
-		this.op = op;
-		this.prefix = prefix;
+	constructor() 
+	{
+		this.type = "UpdateExpression"
+		this.start = 0
+		this.end = 0
+
+		this.valueType = ValueType.Number
+		this.arg = null
+		this.op = null
+		this.prefix = null
 	}
 }
 
@@ -152,7 +159,7 @@ class FunctionDeclaration
 	constructor() {
 		this.type = "FunctionDeclaration"
 		this.valueType = ValueType.Function
-		this.returnType = ValueType.Dynamic
+		this.returnType = ValueType.None
 		this.id = null
 		this.params = null
 		this.body = null
@@ -284,14 +291,18 @@ class Break
 	}
 }
 
-class For
+class ForStatement
 {
-	constructor(init, test, update, body) {
-		this.type = "For";
-		this.init = init;
-		this.test = test;
-		this.update = update;
-		this.body = body;
+	constructor(init, test, update, body) 
+	{
+		this.type = "ForStatement"
+		this.start = 0
+		this.end = 0
+
+		this.init = init
+		this.test = test
+		this.update = update
+		this.body = body
 	}
 }
 
@@ -525,7 +536,7 @@ module.exports = {
 	Array,
 	Object,
 	CallExpression,
-	Update,
+	UpdateExpression,
 	New,
 	Null,
 	FunctionDeclaration,
@@ -542,7 +553,7 @@ module.exports = {
 	Switch,
 	SwitchCase,
 	Break,
-	For,
+	ForStatement,
 	ForIn,
 	While,
 	DoWhile,

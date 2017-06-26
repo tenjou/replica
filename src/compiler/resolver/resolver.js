@@ -152,10 +152,11 @@ const parse =
 		{
 			parse[node.arg.type](node.arg)
 
-			if(activeFunc.returnType !== node.arg.valueType) 
+			const funcReturnType = activeFunc.returnType
+			if(funcReturnType !== node.arg.valueType) 
 			{
-				if(activeFunc.returnType !== ValueType.Dynamic) {
-					logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[activeFunc.valueType]}' to '${node.arg.valueType}'`)
+				if(funcReturnType !== ValueType.None && funcReturnType !== ValueType.Dynamic) {
+					logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[funcReturnType]}' to '${ValueTypeStr[node.arg.valueType]}'`)
 				}
 				else {
 					node.valueType = node.arg.valueType
@@ -167,6 +168,16 @@ const parse =
 		}
 
 		return ValueType.None
+	},
+
+	ForStatement(node)
+	{
+		if(node.init) {
+			parse[node.init.type](node.init)
+		}
+		if(node.test) {
+			parse[node.test.type](node.test)
+		}
 	},
 
 	CallExpression(node)

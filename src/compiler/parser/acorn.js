@@ -6,6 +6,9 @@ let context = null
 let tokenTypes = null
 let activeScope = null
 
+const loopLabel = { kind: "loop" }
+const switchLabel = { kind: "switch" }
+
 const parse =
 {
 	Identifier(liberal) 
@@ -101,7 +104,7 @@ const parse =
 			else if(kind === tokenTypes._const && !(context.type === tokenTypes._in || context.isContextual("of"))) {
 				unexpected()
 			} 
-			else if(decl.id.type != "Identifier" && !(isFor && (context.type === _tokentype.types._in || context.isContextual("of")))) {
+			else if(decl.id.type != "Identifier" && !(isFor && (context.type === tokenTypes._in || context.isContextual("of")))) {
 				context.raise(context.lastTokEnd, "Complex binding patterns require an initialization value")
 			} 
 			else {
@@ -145,9 +148,9 @@ const parse =
 	{
 		if(context.type.prefix) 
 		{
-			var node = this.startNode(),
-					update = this.type === _tokentype.types.incDec;
-			node.operator = this.value;
+			const update = (context.type === tokenTypes.incDec)
+			const node = update ? startNode(AST.UpdateExpression) : startNode(AST.UnaryExpression)
+			node.operator = this.value
 			node.prefix = true
 
 			next()
@@ -161,26 +164,24 @@ const parse =
 				context.raise(node.start, "Deleting local variable in strict mode")
 			}
 
-			return this.finishNode(node, update ? "UpdateExpression" : "UnaryExpression");
+			return finishNode(node)
 		}
 
-		const startPos = context.start
-		const startLoc = context.startLoc
 		const expr = context.parseExprSubscripts(refShorthandDefaultPos)
 
 		if(refShorthandDefaultPos && refShorthandDefaultPos.start) {
 			return expr
 		}
 
-		while(context.type.postfix && !this.canInsertSemicolon()) 
+		while(context.type.postfix && !context.canInsertSemicolon()) 
 		{
-			var node = this.startNodeAt(startPos, startLoc);
-			node.operator = this.value;
-			node.prefix = false;
-			node.argument = expr;
-			this.checkLVal(expr);
-			this.next();
-			expr = this.finishNode(node, "UpdateExpression");
+			const node = startNodeAt(AST.UpdateExpression, context.pos, context.start)
+			node.op = context.value
+			node.prefix = false
+			node.arg = expr
+			context.checkLVal(expr)
+			next()
+			return finishNode(node)
 		}
 
 		return expr
@@ -269,6 +270,65 @@ const parse =
 				return base
 			}
 		}
+	},
+
+	ForStatement() 
+	{
+		next()
+		context.labels.push(loopLabel)
+		expect(tokenTypes.parenL)
+
+		if(context.type === tokenTypes.semi) {
+			return parse.For(null)
+		}
+
+		if(context.type === tokenTypes._var || 
+		   context.type === tokenTypes._let || 
+		   context.type === tokenTypes._const) 
+		{
+			const init = startNode(AST.VariableDeclaration)
+
+			next()
+			init.kind = context.type.keyword
+			parse.Variable(init, true)
+			finishNode(init)
+
+			if((context.type === tokenTypes._in || context.isContextual("of")) && 
+			  init.declarations.length === 1 && 
+			  !(varKind !== tokenTypes._var && init.declarations[0].init)) 
+			{
+				return context.parseForIn(node, init)
+			}
+
+			return parse.For(init)
+		}
+
+		const refShorthandDefaultPos = { start: 0 }
+		const init = parse.Expression(true, refShorthandDefaultPos)
+		if(context.type === tokenTypes._in || context.isContextual("of")) {
+			context.toAssignable(init)
+			context.checkLVal(init)
+			return context.parseForIn(node, init)
+		} 
+		else if(refShorthandDefaultPos.start) {
+			unexpected(refShorthandDefaultPos.start)
+		}
+
+		return parse.For(init)
+	},
+
+	For(init) 
+	{
+		const node = startNode(AST.ForStatement)
+		node.init = init
+		expect(tokenTypes.semi)
+		node.test = (context.type === tokenTypes.semi) ? null : context.parseExpression()
+		expect(tokenTypes.semi)
+		node.update = (context.type === tokenTypes.parenR) ? null : context.parseExpression()
+		expect(tokenTypes.parenR)
+		node.body = context.parseStatement(false)
+		context.labels.pop()
+		return finishNode(node)
 	},
 
 	VarId(decl) {
@@ -1676,7 +1736,7 @@ pp.parseBindingListItem = function (param) {
 pp.checkLVal = function (expr, isBinding, checkClashes) {
 	switch (expr.type) {
 		case "Identifier":
-			if (this.strict && (_identifier.reservedWords.strictBind(expr.name) || _identifier.reservedWords.strict(expr.name))) this.raise(expr.start, (isBinding ? "Binding " : "Assigning to ") + expr.name + " in strict mode");
+			if (this.strict && (_identifier.reservedWords.strictBind(expr.value) || _identifier.reservedWords.strict(expr.value))) this.raise(expr.start, (isBinding ? "Binding " : "Assigning to ") + expr.name + " in strict mode");
 			if (checkClashes) {
 				if (_util.has(checkClashes, expr.name)) this.raise(expr.start, "Argument name clash in strict mode");
 				checkClashes[expr.name] = true;
@@ -2136,8 +2196,7 @@ pp.parseTopLevel = function (node) {
 	return this.finishNode(node, "Program");
 };
 
-var loopLabel = { kind: "loop" },
-		switchLabel = { kind: "switch" };
+
 
 // Parse a single statement.
 //
@@ -2161,8 +2220,8 @@ pp.parseStatement = function (declaration, topLevel) {
 			return this.parseDebuggerStatement(node);
 		case _tokentype.types._do:
 			return this.parseDoStatement(node);
-		case _tokentype.types._for:
-			return this.parseForStatement(node);
+		case tokenTypes._for:
+			return parse.ForStatement()
 
 		case tokenTypes._function: {
 			if(!declaration) { this.unexpected() }
@@ -2255,40 +2314,6 @@ pp.parseDoStatement = function (node) {
 	node.test = this.parseParenExpression();
 	if (this.options.ecmaVersion >= 6) this.eat(_tokentype.types.semi);else this.semicolon();
 	return this.finishNode(node, "DoWhileStatement");
-};
-
-// Disambiguating between a `for` and a `for`/`in` or `for`/`of`
-// loop is non-trivial. Basically, we have to parse the init `var`
-// statement or expression, disallowing the `in` operator (see
-// the second parameter to `parseExpression`), and then check
-// whether the next token is `in` or `of`. When there is no init
-// part (semicolon immediately after the opening parenthesis), it
-// is a regular `for` loop.
-
-pp.parseForStatement = function (node) {
-	this.next();
-	this.labels.push(loopLabel);
-	this.expect(_tokentype.types.parenL);
-	if (this.type === _tokentype.types.semi) return this.parseFor(node, null);
-	if (this.type === _tokentype.types._var || this.type === _tokentype.types._let || this.type === _tokentype.types._const) {
-		var _init = this.startNode(),
-				varKind = this.type;
-		this.next();
-		this.parseVar(_init, true, varKind);
-		this.finishNode(_init, "VariableDeclaration");
-		if ((this.type === _tokentype.types._in || this.options.ecmaVersion >= 6 && this.isContextual("of")) && _init.declarations.length === 1 && !(varKind !== _tokentype.types._var && _init.declarations[0].init)) return this.parseForIn(node, _init);
-		return this.parseFor(node, _init);
-	}
-	var refShorthandDefaultPos = { start: 0 };
-	var init = this.parseExpression(true, refShorthandDefaultPos);
-	if (this.type === _tokentype.types._in || this.options.ecmaVersion >= 6 && this.isContextual("of")) {
-		this.toAssignable(init);
-		this.checkLVal(init);
-		return this.parseForIn(node, init);
-	} else if (refShorthandDefaultPos.start) {
-		this.unexpected(refShorthandDefaultPos.start);
-	}
-	return this.parseFor(node, init);
 };
 
 pp.parseFunctionStatement = function (node) {
@@ -2418,23 +2443,6 @@ pp.parseExpressionStatement = function (node, expr) {
 	node.expression = expr;
 	this.semicolon();
 	return this.finishNode(node, "ExpressionStatement");
-};
-
-
-// Parse a regular `for` loop. The disambiguation code in
-// `parseStatement` will already have parsed the init statement or
-// expression.
-
-pp.parseFor = function (node, init) {
-	node.init = init;
-	this.expect(_tokentype.types.semi);
-	node.test = this.type === _tokentype.types.semi ? null : this.parseExpression();
-	this.expect(_tokentype.types.semi);
-	node.update = this.type === _tokentype.types.parenR ? null : this.parseExpression();
-	this.expect(_tokentype.types.parenR);
-	node.body = this.parseStatement(false);
-	this.labels.pop();
-	return this.finishNode(node, "ForStatement");
 };
 
 // Parse a `for`/`in` and `for`/`of` loop, which are almost

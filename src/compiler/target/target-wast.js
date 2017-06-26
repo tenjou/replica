@@ -59,6 +59,10 @@ const parse =
 		return result
 	},
 
+	ExpressionStatement(node) {
+		return parse[node.expression.type](node.expression)
+	},
+
 	IfStatement(node)
 	{
 		let result = `${tabs}(if\n`
@@ -77,6 +81,41 @@ const parse =
 		return result
 	},
 
+	ForStatement(node)
+	{
+		const blockLabel = "$label$" + activeScope.labelIndex++
+		const loopLabel = "$label$" + activeScope.labelIndex++
+
+		let result = parse[node.init.type](node.init)
+
+		result += `${tabs}(block ${blockLabel}\n`
+		incTabs()
+
+		result += `${tabs}(loop ${loopLabel}\n`
+		incTabs()
+
+		result += `${tabs}(br_if ${blockLabel}\n`
+		incTabs()
+		result += parse[node.test.type](node.test)
+		decTabs()
+		result += `${tabs})\n`
+		
+		decTabs()
+		result += parse[node.body.type](node.body)
+		incTabs()
+
+		result += parse[node.update.type](node.update)
+		result += `${tabs}(br ${loopLabel})\n`
+
+		decTabs()
+		result += `${tabs})\n`
+
+		decTabs()
+		result += `${tabs})\n`
+
+		return result
+	},
+
 	BinaryExpression(node) 
 	{
 		let result = `${tabs}(${types[node.valueType]}.${ops[node.op]}\n`
@@ -88,6 +127,34 @@ const parse =
 
 		result += `${tabs})\n`
 		
+		return result
+	},
+
+	UpdateExpression(node)
+	{
+		let result
+
+		const isGlobal = isIdentifierGlobal(node.arg)
+		if(isGlobal) {
+			result = `${tabs}(set_global `
+		}
+		else {
+			result = `${tabs}(set_local `
+		}
+
+		result += `$${node.arg.value}\n`
+		incTabs()
+
+		result += `${tabs}(${parse.Op(node)}\n`
+		incTabs()
+		result += parse[node.arg.type](node.arg)
+		result += `${tabs}(${types[node.valueType]}.const 1)\n`
+		decTabs()
+		result += `${tabs})\n`
+
+		decTabs()
+		result += `${tabs})\n`
+
 		return result
 	},
 
@@ -186,13 +253,15 @@ const parse =
 
 	ReturnStatement(node)
 	{
-		let result = ""
-
-		if(node.arg) {
-			result = `${parse[node.arg.type](node.arg)}`
+		if(!node.arg) {
+			return `${tabs}(return)\n`
 		}
-
-		result += `${tabs}(return)\n`
+		
+		let result = `${tabs}(return\n`
+		incTabs()
+		result += `${parse[node.arg.type](node.arg)}`
+		decTabs()
+		result += `${tabs})\n`
 
 		return result
 	},
@@ -211,6 +280,11 @@ const parse =
 		}
 
 		return `${tabs}(export "${linkName}" ${typedLinkName})\n`
+	},
+
+	Op(node) {
+		const result = `${types[node.valueType]}.${ops[node.op]}`
+		return result
 	}
 }
 
@@ -250,7 +324,9 @@ types[ValueType.Number] = "i32"
 
 const ops = {
 	"+": "add",
+	"++": "add",
 	"-": "sub",
+	"--": "sub",
 	"*": "mul",
 	"/": "div_s",
 	"%": "rem_s",

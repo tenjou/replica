@@ -116,6 +116,11 @@ const parse =
 		}
 		return node
 	},
+
+	ForStatement(node)
+	{
+		return node
+	},
 	
 	CallExpression(node) {
 		return node
