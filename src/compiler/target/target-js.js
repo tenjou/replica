@@ -159,7 +159,7 @@ function compileContent(file, needModule)
 		const relativePath = path.relative(process.cwd(), file.fullPath).replace(/\\/g,"/");
 
 		result += `(function() `;
-		result += compile_Block(file.blockNode, compileSourceExports);
+		result += parse.Program(file.blockNode, compileSourceExports);
 		result += ")();\n\n"
 		result += `//# sourceURL=${relativePath}`
 
@@ -281,12 +281,244 @@ function getNameFromNode(node)
 	return null;
 }
 
-function compile_Identifier(node) {
-	return node ? node.value : null
-}
+const parse =
+{
+	Identifier(node) {
+		return node.value
+	},
 
-function compile_Number(node) {
-	return node ? node.value : null
+	Number(node) {
+		return node.value
+	},
+
+	BinaryExpression(node)
+	{
+		let result
+
+		if(node.left instanceof AST.BinaryExpression ||
+		   node.left instanceof AST.Conditional) 
+		{
+			result = "(" + parse[node.left.constructor.name](node.left) + ")"
+		}
+		else {
+			result = parse[node.left.constructor.name](node.left)
+		}
+
+		result += " " + node.op + " "
+
+		if(node.right instanceof AST.BinaryExpression ||
+		   node.right instanceof AST.Conditional) 
+		{
+			result += "(" + parse[node.right.constructor.name](node.right) + ")"
+		}
+		else {
+			result += parse[node.right.constructor.name](node.right)
+		}
+
+		return result
+	},
+
+	UpdateExpression(node)
+	{
+		let result
+
+		if(node.prefix) {
+			result = node.op + parse[node.arg.constructor.name](node.arg)
+		}
+		else {
+			result = parse[node.arg.constructor.name](node.arg) + node.op
+		}
+
+		return result
+	},
+
+	CallExpression(node)
+	{
+		let result = parse[node.callee.constructor.name](node.callee)
+		result += "(" + parse.Args(node.arguments) + ")"
+		return result
+	},
+
+	BlockStatement(node, appendFunc)
+	{
+		incTabs()
+
+		let blockResult = ""
+		const body = node.scope.body
+		for(let n = 0; n < body.length; n++)
+		{
+			const node = body[n]
+			const nodeResult = parse[node.constructor.name](node)
+			if(!nodeResult) { continue }
+
+			blockResult += tabs + nodeResult + "\n"
+		}
+
+		if(appendFunc)
+		{
+			let appendResult = appendFunc()
+			if(appendResult) {
+				blockResult += `${tabs}${appendResult}\n`
+			}
+		}
+
+		decTabs()
+
+		if(numTabs)
+		{
+			if(!blockResult) {
+				return "{}"
+			}
+			else {
+				return "{\n" + blockResult + tabs + "}"
+			}
+		}
+
+		return blockResult
+	},
+
+	ExpressionStatement(node) {
+		return parse[node.expr.constructor.name](node.expr)
+	},
+
+	IfStatement(node)
+	{
+		let result = "if(" + parse[node.test.constructor.name](node.test) + ") "
+
+		if(node.consequent instanceof AST.BlockStatement) {
+			result += parse[node.consequent.constructor.name](node.consequent)
+		}
+		else {
+			incTabs()
+			result += parse[node.consequent.constructor.name](node.consequent) + "\n"
+			decTabs()
+		}
+
+		if(node.alternate)
+		{
+			if(node.alternate instanceof IfStatement){
+				result += "\n" + tabs + "else " + parse.If(node.alternate)
+			}
+			else
+			{
+				result += "\n" + tabs + "else "
+
+				if(node.consequent instanceof AST.BlockStatement) {
+					result += parse[node.alternate.constructor.name](node.alternate)
+				}
+				else {
+					incTabs()
+					result += parse[node.alternate.constructor.name](node.alternate) + "\n"
+					decTabs()
+				}
+
+				result += tabs
+			}
+		}
+
+		return result
+	},
+
+	ForStatement(node)
+	{
+		const x = 10
+		let result = "for(" +
+			parse[node.init.constructor.name](node.init) + "; " +
+			parse[node.test.constructor.name](node.test) + "; " +
+			parse[node.update.constructor.name](node.update) + ") " +
+			parse[node.body.constructor.name](node.body)
+
+		return result
+	},
+
+	ForInStatement(node)
+	{
+		let result = "for(" +
+			parse[node.left.constructor.name](node.left) + " in " +
+			parse[node.right.constructor.name](node.right) + ") " +
+			parse[node.body.constructor.name](node.body)
+
+		return result
+	},
+
+	ReturnStatement(node)
+	{
+		const content = parse[node.arg.constructor.name](node.arg)
+
+		if(content) {
+			const result = "return " + content
+			return result
+		}
+
+		return "return"
+	},
+
+	VariableDeclaration(node)
+	{
+		const decls = node.decls
+
+		let result = node.kind + " " + parse.Variable(decls[0])
+
+		for(let n = 1; n < decls.length; n++) {
+			result += ", " + parse.Variable(decls[n])
+		}
+
+		return result
+	},
+
+	Variable(node)
+	{
+		const declName = parse[node.id.constructor.name](node.id)
+
+		if(node.expr) {
+			const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${parse[node.expr.constructor.name](node.expr)}`
+			return result
+		}
+
+		return declName
+	},
+
+	FunctionDeclaration(node, withoutFunc, funcName)
+	{
+		if(!funcName)
+		{
+			funcName = parse[node.id.constructor.name](node.id)
+			if(funcName) {
+				funcName = " " + funcName
+			}
+		}
+		else {
+			funcName = " " + funcName
+		}
+
+		let result = ""
+		if(!withoutFunc) {
+			result = "function"
+		}
+
+		result += `${funcName}(${parse.Args(node.params)}) ${parse.BlockStatement(node.body)}`
+
+		return result
+	},
+
+	Args(args)
+	{
+		if(args.length === 0) { return "" }
+
+		let node = args[0]
+		let result = parse[node.constructor.name](node)
+
+		for(let n = 1; n < args.length; n++) {
+			node = args[n]
+			result += ", " + parse[node.constructor.name](node)
+		}
+
+		return result
+	},
+
+	Program(node) {
+		return parse.BlockStatement(node)
+	}
 }
 
 function compile_Bool(node) {
@@ -342,31 +574,6 @@ function compile_Name(node)
 	}
 
 	return result;
-}
-
-function compile_VariableDeclaration(node)
-{
-	const decls = node.decls;
-
-	let result = node.kind + " " + compile_VariableNode(decls[0]);
-
-	for(let n = 1; n < decls.length; n++) {
-		result += ", " + compile_VariableNode(decls[n]);
-	}
-
-	return result;
-}
-
-function compile_VariableNode(node)
-{
-	const declName = doCompileLookup(node.id)
-
-	if(node.expr) {
-		const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${doCompileLookup(node.expr)}`
-		return result;
-	}
-
-	return declName;
 }
 
 const AssignmentExpression = function(node) 
@@ -441,220 +648,6 @@ function compile_ObjectMember(node)
 	{
 		const value = doCompileLookup(node.value);
 		result = key + ": " + value;
-	}
-
-	return result;
-}
-
-function compile_Binary(node)
-{
-	let result;
-
-	if(node.left instanceof AST.BinaryExpression ||
-	   node.left instanceof AST.Conditional) 
-	{
-		result = "(" + doCompileLookup(node.left) + ")";
-	}
-	else {
-		result = doCompileLookup(node.left);
-	}
-
-	result += " " + node.op + " ";
-
-	if(node.right instanceof AST.BinaryExpression ||
-	   node.right instanceof AST.Conditional) 
-	{
-		result += "(" + doCompileLookup(node.right) + ")";
-	}
-	else {
-		result += doCompileLookup(node.right);
-	}
-
-	return result;
-}
-
-function compile_Update(node)
-{
-	let result;
-
-	if(node.prefix) {
-		result = node.op + doCompileLookup(node.arg);
-	}
-	else {
-		result = doCompileLookup(node.arg) + node.op;
-	}
-
-	return result;
-}
-
-function compile_Call(node)
-{
-	if(context.flags.transpiling) {
-		return compile_Call_ecma5(node);
-	}
-
-	return compile_Call_ecma6(node);
-}
-
-function compile_Call_ecma5(node)
-{
-	const value = doCompileLookup(node.callee);
-	const args = compile_Args(node.arguments);
-
-	let result;
-
-	if(node.callee.type === "Super" ||
-	   (node.callee.type == "Name" && node.callee.parent.type === "Super"))
-	{
-		result = value + ".call(this";
-		if(args) {
-			result += ", " + args;
-		}
-		result += ")";
-	}
-	else if(node.callee instanceof AST.FunctionDeclaration) {
-		result = `(${value}) (${args})`;
-	}
-	else {
-		result = value + "(" + args + ")";
-	}
-
-	return result;
-}
-
-function compile_Call_ecma6(node)
-{
-	let result = doCompileLookup(node.value);
-	result += "(" + compile_Args(node.arguments) + ")";
-}
-
-function compile_Args(args)
-{
-	if(args.length === 0) { return ""; }
-
-	let node = args[0];
-	let result = doCompileLookup(node);
-
-	for(let n = 1; n < args.length; n++) {
-		node = args[n];
-		result += ", " + doCompileLookup(node);
-	}
-
-	return result;
-}
-
-function compile_Function(node, withoutFunc, funcName)
-{
-	if(!funcName)
-	{
-		funcName = doCompileLookup(node.id);
-		if(funcName) {
-			funcName = " " + funcName;
-		}
-	}
-	else {
-		funcName = " " + funcName;
-	}
-
-	let result = "";
-	if(!withoutFunc) {
-		result = "function";
-	}
-
-	result += funcName + "(" + compile_Args(node.params) + ") " +
-		compile_Block(node.body);
-
-	return result;
-}
-
-function compile_Block(node, appendFunc)
-{
-	incTabs();
-
-	let blockResult = "";
-	const body = node.scope.body;
-	for(let n = 0; n < body.length; n++)
-	{
-		let node = body[n];
-
-		let nodeResult = doCompileLookup(node);
-		if(!nodeResult) {
-			continue;
-		}
-
-		blockResult += tabs + nodeResult + "\n"
-	}
-
-	if(appendFunc)
-	{
-		let appendResult = appendFunc();
-		if(appendResult) {
-			blockResult += `${tabs}${appendResult}\n`;
-		}
-	}
-
-	decTabs();
-
-	if(numTabs)
-	{
-		if(!blockResult) {
-			return "{}";
-		}
-		else {
-			return "{\n" + blockResult + tabs + "}";
-		}
-	}
-
-	return blockResult;
-}
-
-function compile_Return(node)
-{
-	let content = doCompileLookup(node.arg);
-	let result = "return";
-	if(content) {
-		result += " " + content;
-	}
-
-	return result;
-}
-
-function compile_If(node)
-{
-	let result = "if(" + doCompileLookup(node.test) + ") ";
-
-	if(node.consequent.type !== "Block")
-	{
-		incTabs();
-		result += doCompileLookup(node.consequent) + ";\n";
-		decTabs();
-	}
-	else {
-		result += doCompileLookup(node.consequent);
-	}
-
-	if(node.alternate)
-	{
-		if(node.alternate.type === "If")
-		{
-			result += "\n" + tabs + "else " + compile_If(node.alternate);
-		}
-		else
-		{
-			result += "\n" + tabs + "else ";
-
-			if(node.alternate.type !== "Block")
-			{
-				incTabs();
-				result += doCompileLookup(node.alternate) + ";\n";
-				decTabs();
-			}
-			else {
-				result += doCompileLookup(node.alternate);
-			}
-
-			result += tabs;
-		}
 	}
 
 	return result;
@@ -770,26 +763,7 @@ function compile_Break(node) {
 	return output;
 }
 
-function compile_For(node)
-{
-	let result = "for(" +
-		doCompileLookup(node.init) + "; " +
-		doCompileLookup(node.test) + "; " +
-		doCompileLookup(node.update) + ") " +
-		doCompileLookup(node.body);
 
-	return result;
-}
-
-function compile_ForIn(node)
-{
-	let result = "for(" +
-		doCompileLookup(node.left) + " in " +
-		doCompileLookup(node.right) + ") " +
-		doCompileLookup(node.body);
-
-	return result;
-}
 
 function compile_While(node)
 {
@@ -1254,69 +1228,18 @@ const compile_AssignmentPattern = (node) => {
 
 function incTabs()
 {
-	numTabs++;
+	numTabs++
 	if(numTabs > 1) {
-		tabs += "\t";
+		tabs += "\t"
 	}
 }
 
 function decTabs()
 {
 	if(numTabs > 1) {
-		tabs = tabs.slice(0, -1);
+		tabs = tabs.slice(0, -1)
 	}
-	numTabs--;
-}
-
-function doCompileLookup(node) {
-	return node ? compileLookup[node.constructor.name](node) : "";
-}
-
-const compileLookup = {
-	Identifier: compile_Identifier,
-	Number: compile_Number,
-	Bool: compile_Bool,
-	String: compile_String,
-	New: compile_New,
-	Null: compile_Null,
-	Name: compile_Name,
-	VariableDeclaration: compile_VariableDeclaration,
-	Array: compile_Array,
-	Object: compile_Object,
-	BinaryExpression: compile_Binary,
-	Update: compile_Update,
-	CallExpression: compile_Call,
-	Block: compile_Block,
-	FunctionDeclaration: compile_Function,
-	ReturnStatement: compile_Return,
-	If: compile_If,
-	Conditional: compile_Conditional,
-	Unary: compile_Unary,
-	Switch: compile_Switch,
-	Break: compile_Break,
-	For: compile_For,
-	ForIn: compile_ForIn,
-	While: compile_While,
-	DoWhile: compile_DoWhile,
-	Continue: compile_Continue,
-	Label: compile_Label,
-	Sequence: compile_Sequence,
-	Try: compile_Try,
-	Throw: compile_Throw,
-	Import: compile_Import,
-	Export: compile_Export,
-	Class: compile_Class,
-	ThisExpression: compile_ThisExpression,
-	AssignmentExpression,
-	LogicalExpression: compile_LogicalExpression,
-	ArrowFunctionExpression: compile_ArrowFunctionExpression,
-	Super: compile_Super,
-	TemplateLiteral: compile_TemplateLiteral,
-	EmptyStatement: compile_EmptyStatement,
-	ExportDefaultDeclaration: compile_ExportDefaultDeclaration,
-	ExportAllDeclaration: compile_ExportAllDeclaration,
-	ObjectPattern: compile_ObjectPattern,
-	AssignmentPattern: compile_AssignmentPattern
+	numTabs--
 }
 
 module.exports = {

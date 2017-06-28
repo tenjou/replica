@@ -245,7 +245,7 @@ function uglifyContent(content)
 	return result ? result.code : 0;
 }
 
-const target = "wast"
+const target = "js"
 
 function updateTick()
 {

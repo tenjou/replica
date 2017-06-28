@@ -8,10 +8,27 @@ function Scope() {
 	this.tmpIndex = 0
 }
 
+class Program 
+{
+	constructor() 
+	{
+		this.type = "Program"
+		this.start = 0
+		this.end = 0
+
+		this.scope = new Scope()
+		this.sourceType = null
+	}
+}
+
 class Identifier
 {
-	constructor() {
+	constructor() 
+	{
 		this.type = "Identifier"
+		this.start = 0
+		this.end = 0
+
 		this.value = null
 		this.valueType = ValueType.Number
 	}
@@ -19,12 +36,14 @@ class Identifier
 
 class Number
 {
-	constructor(value) {
+	constructor(value) 
+	{
 		this.type = "Number"
-		this.valueType = ValueType.Number
-		this.value = value
 		this.start = 0
 		this.end = 0
+
+		this.value = value
+		this.valueType = ValueType.Number
 		this.simple = true
 	}
 }
@@ -105,6 +124,18 @@ class Object
 	constructor(value) {
 		this.type = "Object";
 		this.value = value;
+	}
+}
+
+class ExpressionStatement
+{
+	constructor()
+	{
+		this.type = "ExpressionStatement"
+		this.start = 0
+		this.end = 0
+
+		this.expr = null
 	}
 }
 
@@ -235,13 +266,17 @@ class ReturnStatement
 	}
 }
 
-class If
+class IfStatement
 {
-	constructor(test, consequent, alternate) {
-		this.type = "If";
-		this.test = test;
-		this.consequent = consequent;
-		this.alternate = alternate;
+	constructor(test, consequent, alternate) 
+	{
+		this.type = "IfStatement"
+		this.start = 0
+		this.end = 0
+
+		this.test = test
+		this.consequent = consequent
+		this.alternate = alternate
 	}
 }
 
@@ -350,11 +385,15 @@ class Label
 	}
 }
 
-class Sequence
+class SequenceExpression
 {
-	constructor(exprs) {
-		this.type = "Sequence";
-		this.exprs = exprs;
+	constructor() 
+	{
+		this.type = "SequenceExpression"
+		this.start = 0
+		this.end = 0
+
+		this.exprs = []
 	}
 }
 
@@ -526,6 +565,7 @@ class AssignmentPattern
 
 module.exports = {
 	Scope,
+	Program,
 	Identifier,
 	Number,
 	Bool,
@@ -545,9 +585,10 @@ module.exports = {
 	MethodDef,
 	ThisExpression,
 	Super,
+	ExpressionStatement,
 	BlockStatement,
 	ReturnStatement,
-	If,
+	IfStatement,
 	Conditional,
 	Unary,
 	Switch,
@@ -559,7 +600,7 @@ module.exports = {
 	DoWhile,
 	Continue,
 	Label,
-	Sequence,
+	SequenceExpression,
 	Try,
 	Throw,
 	Catch,

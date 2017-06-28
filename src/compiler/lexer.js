@@ -96,7 +96,7 @@ class SourceFile
 				this.clear()
 				this.blockNode = node
 				
-				parse_Body(node.body, node.scope)
+				// parse_Body(node.body, node.scope)
 
 				ctx.currSourceFile = prevSourceFile;
 			} break;

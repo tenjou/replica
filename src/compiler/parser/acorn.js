@@ -68,7 +68,7 @@ const parse =
 		expect(tokenTypes.braceL)
 
 		while(!eat(tokenTypes.braceR)) {
-			const statementNode = context.parseStatement(true)
+			const statementNode = parse.Statement(true)
 			body.push(statementNode)
 		}
 
@@ -119,6 +119,25 @@ const parse =
 		}
 
 		return node
+	},
+
+	Expression(noIn, refShorthandDefaultPos) 
+	{
+		const expr = parse.Assign(noIn, refShorthandDefaultPos, false)
+		if(context.type === tokenTypes.comma) 
+		{
+			const node = startNodeAt(AST.SequenceExpression, context.pos, context.loc)
+			node.exprs.push(exp)
+
+			while(eat(tokenTypes.comma)) {
+				const assignNode = parse.Assign(noIn, refShorthandDefaultPos)
+				node.exprs.push(assignNode)
+			}
+
+			return finishNode(node)
+		}
+
+		return expr
 	},
 
 	ExpressionOp(left, leftStartPos, leftStartLoc, minPrec, noIn) 
@@ -272,6 +291,110 @@ const parse =
 		}
 	},
 
+	TopLevel() 
+	{
+		let first = true
+
+		const node = startNode(AST.Program)
+		const body = node.scope.body
+
+		activeScope = node.scope
+
+		while(context.type !== tokenTypes.eof) {
+			const stmt = parse.Statement(true, true)
+			body.push(stmt)
+			if(first) {
+				context.setStrict(true)
+				first = false
+			}
+		}
+
+		next()
+		node.sourceType = "module"
+
+		return finishNode(node)
+	},
+
+	Statement(declaration, topLevel) 
+	{
+		const startType = context.type
+
+		switch(startType) 
+		{
+			case tokenTypes._break:
+			case tokenTypes._continue:
+				return context.parseBreakContinueStatement(node, starttype.keyword)
+
+			case tokenTypes._debugger:
+				return context.parseDebuggerStatement(node)
+
+			case tokenTypes._do:
+				return context.parseDoStatement(node)
+			case tokenTypes._for:
+				return parse.ForStatement()
+
+			case tokenTypes._function: {
+				if(!declaration) { unexpected() }
+				return parse.FunctionStatement()
+			}
+			case tokenTypes._class:
+				if(!declaration) { unexpected() }
+				return context.parseClass(node, true)
+
+			case tokenTypes._if:
+				return parse.IfStatement()
+			case tokenTypes._return:
+				return parse.ReturnStatement()
+			case tokenTypes._switch:
+				return context.parseSwitchStatement(node)
+			case tokenTypes._throw:
+				return context.parseThrowStatement(node)
+			case tokenTypes._try:
+				return context.parseTryStatement(node)
+
+			case tokenTypes._let:
+			case tokenTypes._const:
+				if(!declaration) { unexpected() }
+			case tokenTypes._var: {
+				const node = startNode(AST.VariableDeclaration)
+				return parse.VariableDeclaration(node, starttype)
+			}
+
+			case tokenTypes._while:
+				return context.parseWhileStatement(node)
+			case tokenTypes._with:
+				return context.parseWithStatement(node)
+			case tokenTypes.braceL:
+				return parse.Block()
+			case tokenTypes.semi:
+				return context.parseEmptyStatement(node)
+			case tokenTypes._export:
+			case tokenTypes._import:
+				return (startType === tokenTypes._import) ? context.parseImport(node) : parse.Export(node)
+
+			default:
+			{
+				const maybeName = context.value
+				const expr = parse.Expression()
+
+				if(startType === tokenTypes.name && expr.type === "Identifier" && eat(tokenTypes.colon)) {
+					return context.parseLabeledStatement(node, maybeName, expr)
+				}
+				else {
+					return parse.ExpressionStatement(expr)
+				}
+			}
+		}
+	},
+
+	ExpressionStatement(expr) 
+	{
+		const node = startNode(AST.ExpressionStatement)
+		node.expr = expr
+		semicolon()
+		return finishNode(node)
+	},
+
 	ForStatement() 
 	{
 		next()
@@ -287,9 +410,9 @@ const parse =
 		   context.type === tokenTypes._const) 
 		{
 			const init = startNode(AST.VariableDeclaration)
+			init.kind = context.type.keyword
 
 			next()
-			init.kind = context.type.keyword
 			parse.Variable(init, true)
 			finishNode(init)
 
@@ -317,16 +440,25 @@ const parse =
 		return parse.For(init)
 	},
 
+	IfStatement() {
+		next()
+		const node = startNode(AST.IfStatement)
+		node.test = parse.ParenExpression()
+		node.consequent = parse.Statement(false)
+		node.alternate = eat(tokenTypes._else) ? parse.Statement(false) : null
+		return finishNode(node)
+	},
+
 	For(init) 
 	{
 		const node = startNode(AST.ForStatement)
 		node.init = init
 		expect(tokenTypes.semi)
-		node.test = (context.type === tokenTypes.semi) ? null : context.parseExpression()
+		node.test = (context.type === tokenTypes.semi) ? null : parse.Expression()
 		expect(tokenTypes.semi)
-		node.update = (context.type === tokenTypes.parenR) ? null : context.parseExpression()
+		node.update = (context.type === tokenTypes.parenR) ? null : parse.Expression()
 		expect(tokenTypes.parenR)
-		node.body = context.parseStatement(false)
+		node.body = parse.Statement(false)
 		context.labels.pop()
 		return finishNode(node)
 	},
@@ -405,7 +537,7 @@ const parse =
 		const isExpression = allowExpression && context.type !== tokenTypes.braceL
 
 		if(isExpression) {
-			node.body = context.parseMaybeAssign()
+			node.body = parse.Assign()
 			node.expression = true
 		} 
 		else 
@@ -492,11 +624,18 @@ const parse =
 
 		if(eat(tokenTypes.semi) || context.insertSemicolon()) {}
 		else {
-			node.arg = context.parseExpression()
+			node.arg = parse.Expression()
 			semicolon()
 		}
 
 		return finishNode(node)
+	},
+
+	ParenExpression() {
+		expect(tokenTypes.parenL)
+		const value = parse.Expression()
+		expect(tokenTypes.parenR)
+		return value
 	},
 
 	Export() 
@@ -538,7 +677,7 @@ const parse =
 
 		// export var|const|let|function|class ...
 		if(context.shouldParseExportStatement()) {
-			node.declaration = context.parseStatement(true)
+			node.declaration = parse.Statement(true)
 			node.specifiers = []
 			node.source = null
 		}
@@ -762,41 +901,6 @@ pp.checkPropClash = function (prop, propHash) {
 	other[kind] = true;
 };
 
-// ### Expression parsing
-
-// These nest, from the most general expression type at the top to
-// 'atomic', nondivisible expression types at the bottom. Most of
-// the functions will simply let the function(s) below them parse,
-// and, *if* the syntactic construct they handle is present, wrap
-// the AST node that the inner parser gave them in another node.
-
-// Parse a full expression. The optional arguments are used to
-// forbid the `in` operator (in for loops initalization expressions)
-// and provide reference for storing '=' operator inside shorthand
-// property assignment in contexts where both object expression
-// and object pattern might appear (so it's possible to raise
-// delayed syntax error at correct position).
-
-pp.parseExpression = function (noIn, refShorthandDefaultPos) {
-	var startPos = this.start,
-			startLoc = this.startLoc;
-	var expr = parse.Assign(noIn, refShorthandDefaultPos, false)
-	if (this.type === _tokentype.types.comma) {
-		var node = this.startNodeAt(startPos, startLoc);
-		node.expressions = [expr];
-		while (this.eat(_tokentype.types.comma)) node.expressions.push(this.parseMaybeAssign(noIn, refShorthandDefaultPos));
-		return this.finishNode(node, "SequenceExpression");
-	}
-	return expr;
-};
-
-// Parse an assignment expression. This includes applications of
-// operators like `+=`.
-
-
-
-// Parse a ternary conditional (`?:`) operator.
-
 pp.parseMaybeConditional = function (noIn, refShorthandDefaultPos) {
 	var startPos = this.start,
 			startLoc = this.startLoc;
@@ -983,13 +1087,6 @@ pp.parseLiteral = function(value)
 	return node;
 };
 
-pp.parseParenExpression = function () {
-	this.expect(_tokentype.types.parenL);
-	var val = this.parseExpression();
-	this.expect(_tokentype.types.parenR);
-	return val;
-};
-
 pp.parseParenAndDistinguishExpression = function (canBeArrow) {
 	var startPos = this.start,
 			startLoc = this.startLoc,
@@ -1042,7 +1139,7 @@ pp.parseParenAndDistinguishExpression = function (canBeArrow) {
 			val = exprList[0];
 		}
 	} else {
-		val = this.parseParenExpression();
+		val = parse.ParenExpression()
 	}
 
 	if (this.options.preserveParens) {
@@ -2147,13 +2244,10 @@ var Parser = (function () {
 		}
 	};
 
-	Parser.prototype.parse = function parse() {
-		var node = this.options.program || this.startNode();
-		node.scope = new AST.Scope()
-		activeScope = node.scope
-		this.nextToken();
-		return this.parseTopLevel(node);
-	};
+	Parser.prototype.parse = function() {
+		this.nextToken()
+		return parse.TopLevel()
+	}
 
 	return Parser;
 })();
@@ -2177,106 +2271,6 @@ var pp = _state.Parser.prototype;
 // statements, and wraps them in a Program node.  Optionally takes a
 // `program` argument.  If present, the statements will be appended
 // to its body instead of creating a new node.
-
-pp.parseTopLevel = function (node) {
-	var first = true;
-	if (!node.body) node.body = [];
-	while (this.type !== _tokentype.types.eof) {
-		var stmt = this.parseStatement(true, true);
-		node.body.push(stmt);
-		if (first) {
-			if (this.isUseStrict(stmt)) this.setStrict(true);
-			first = false;
-		}
-	}
-	this.next();
-	if (this.options.ecmaVersion >= 6) {
-		node.sourceType = this.options.sourceType;
-	}
-	return this.finishNode(node, "Program");
-};
-
-
-
-// Parse a single statement.
-//
-// If expecting a statement and finding a slash operator, parse a
-// regular expression literal. This is to handle cases like
-// `if (foo) /blah/.exec(foo)`, where looking at the previous token
-// does not help.
-
-pp.parseStatement = function (declaration, topLevel) {
-	var starttype = this.type,
-			node = this.startNode();
-
-	// Most types of statements are recognized by the keyword they
-	// start with. Many are trivial to parse, some require a bit of
-	// complexity.
-
-	switch (starttype) {
-		case _tokentype.types._break:case _tokentype.types._continue:
-			return this.parseBreakContinueStatement(node, starttype.keyword);
-		case _tokentype.types._debugger:
-			return this.parseDebuggerStatement(node);
-		case _tokentype.types._do:
-			return this.parseDoStatement(node);
-		case tokenTypes._for:
-			return parse.ForStatement()
-
-		case tokenTypes._function: {
-			if(!declaration) { this.unexpected() }
-			return parse.FunctionStatement()
-		}
-
-		case _tokentype.types._class:
-			if (!declaration) this.unexpected();
-			return this.parseClass(node, true);
-		case _tokentype.types._if:
-			return this.parseIfStatement(node);
-		case tokenTypes._return:
-			return parse.ReturnStatement()
-		case _tokentype.types._switch:
-			return this.parseSwitchStatement(node);
-		case _tokentype.types._throw:
-			return this.parseThrowStatement(node);
-		case _tokentype.types._try:
-			return this.parseTryStatement(node);
-
-		case tokenTypes._let:
-		case tokenTypes._const:
-			if(!declaration) { unexpected() }
-		case tokenTypes._var: {
-			const node = startNode(AST.VariableDeclaration)
-			return parse.VariableDeclaration(node, starttype)
-		}
-
-		case _tokentype.types._while:
-			return this.parseWhileStatement(node);
-		case _tokentype.types._with:
-			return this.parseWithStatement(node);
-		case _tokentype.types.braceL:
-			return parse.Block()
-		case _tokentype.types.semi:
-			return this.parseEmptyStatement(node);
-		case _tokentype.types._export:
-		case _tokentype.types._import:
-			if (!this.options.allowImportExportEverywhere) {
-				if (!topLevel) this.raise(this.start, "'import' and 'export' may only appear at the top level");
-				if (!this.inModule) this.raise(this.start, "'import' and 'export' may appear only with 'sourceType: module'");
-			}
-			return starttype === _tokentype.types._import ? this.parseImport(node) : parse.Export(node)
-
-		// If the statement does not start with a statement keyword or a
-		// brace, it's an ExpressionStatement or LabeledStatement. We
-		// simply start parsing an expression, and afterwards, if the
-		// next token is a colon and the expression was a simple
-		// Identifier node, we switch to interpreting it as a label.
-		default:
-			var maybeName = this.value,
-					expr = this.parseExpression();
-			if (starttype === _tokentype.types.name && expr.type === "Identifier" && this.eat(_tokentype.types.colon)) return this.parseLabeledStatement(node, maybeName, expr);else return this.parseExpressionStatement(node, expr);
-	}
-};
 
 pp.parseBreakContinueStatement = function (node, keyword) {
 	var isBreak = keyword == "break";
@@ -2319,14 +2313,6 @@ pp.parseDoStatement = function (node) {
 pp.parseFunctionStatement = function (node) {
 	this.next();
 	return this.parseFunction(node, true);
-};
-
-pp.parseIfStatement = function (node) {
-	this.next();
-	node.test = this.parseParenExpression();
-	node.consequent = this.parseStatement(false);
-	node.alternate = this.eat(_tokentype.types._else) ? this.parseStatement(false) : null;
-	return this.finishNode(node, "IfStatement");
 };
 
 pp.parseSwitchStatement = function (node) {
@@ -2437,12 +2423,6 @@ pp.parseLabeledStatement = function (node, maybeName, expr) {
 	this.labels.pop();
 	node.label = expr;
 	return this.finishNode(node, "LabeledStatement");
-};
-
-pp.parseExpressionStatement = function (node, expr) {
-	node.expression = expr;
-	this.semicolon();
-	return this.finishNode(node, "ExpressionStatement");
 };
 
 // Parse a `for`/`in` and `for`/`of` loop, which are almost
