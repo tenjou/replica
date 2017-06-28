@@ -29,8 +29,10 @@ class Identifier
 		this.start = 0
 		this.end = 0
 
+		this.ref = this
+
 		this.value = null
-		this.valueType = ValueType.Number
+		this.valueType = ValueType.Dynamic
 	}
 }
 
@@ -70,8 +72,8 @@ class String
 		this.start = 0
 		this.end = 0
 
-		this.value = value
-		this.raw = raw
+		this.value = null
+		this.raw = null
 		this.valueType = ValueType.String
 		this.simple = true
 	}
@@ -191,15 +193,22 @@ class Null
 
 class FunctionDeclaration
 {
-	constructor() {
+	constructor() 
+	{
 		this.type = "FunctionDeclaration"
-		this.valueType = ValueType.Function
-		this.returnType = ValueType.None
+		this.start = 0
+		this.end = 0
+
+		this.ref = null
 		this.id = null
 		this.params = null
 		this.body = null
 		this.generator = false
 		this.expression = false
+		this.resolved = false
+
+		this.valueType = ValueType.Function
+		this.returnType = ValueType.Dynamic
 	}
 }
 

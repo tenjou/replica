@@ -389,7 +389,7 @@ const parse =
 				if(!declaration) { unexpected() }
 			case tokenTypes._var: {
 				const node = startNode(AST.VariableDeclaration)
-				return parse.VariableDeclaration(node, starttype)
+				return parse.VariableDeclaration(node, startType)
 			}
 
 			case tokenTypes._while:
@@ -580,6 +580,17 @@ const parse =
 			context.inFunction = true
 			context.inGenerator = node.generator
 			context.labels = []
+
+			if(eat(tokenTypes.colon)) 
+			{
+				if(context.type === tokenTypes.name) {
+					node.returnType = ValueType[context.value]
+					next()
+				}
+				else {
+					context.raise(context.lastTokEnd, "Invalid variable type defined")
+				}
+			}
 
 			node.body = parse.Block(true)
 			node.expression = false

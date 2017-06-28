@@ -1,4 +1,4 @@
-const AST = require("../AST")
+const AST = require("../ast")
 const { ValueType } = require("../types")
 const logger = require("../../logger")
 
@@ -29,7 +29,7 @@ const parse =
 		const body = node.scope.body
 		for(let n = 0; n < body.length; n++) {
 			const bodyNode = body[n]
-			const resultNode = parse[bodyNode.type](bodyNode)
+			const resultNode = parse[bodyNode.constructor.name](bodyNode)
 			body[n] = resultNode
 		}
 	},
@@ -107,6 +107,10 @@ const parse =
 	FunctionDeclaration(node) {
 		parse.BlockDeclaration(node.body)
 		return node
+	},
+
+	ExpressionStatement(node) {
+		return parse[node.expr.constructor.name](node.expr)
 	},
 
 	ReturnStatement(node) 

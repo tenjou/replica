@@ -1,4 +1,4 @@
-const AST = require("../ast.js")
+const AST = require("../ast")
 const { ValueTypeStr } = require("../types")
 const path = require("path")
 const utils = require("../utils")
@@ -12,6 +12,8 @@ const context = {
 	compileIndex: 0,
 	flags: null
 };
+
+const commentType = true
 
 const requirements = {
 	inherits: false
@@ -291,6 +293,14 @@ const parse =
 		return node.value
 	},
 
+	Bool(node) {
+		return node.value ? "true" : "false"
+	},
+
+	String(node) {
+		return node.raw
+	},
+
 	BinaryExpression(node)
 	{
 		let result
@@ -453,6 +463,33 @@ const parse =
 		return "return"
 	},
 
+	Break(node) {
+		const output = node.label ? `break ${parse[node.label.constructor.name](node.label)}` : "break"
+		return output
+	},
+
+	While(node)
+	{
+		if(node.body instanceof AST.EmptyStatement) {
+			return ""
+		}
+
+		let result = "while(" +
+			parse[node.test.constructor.name](node.test) + ") " +
+			parse[node.body.constructor.name](node.body)
+
+		return result
+	},
+
+	DoWhile(node)
+	{
+		let result = "do " +
+			parse[node.body.constructor.name](node.body) +
+			" while(" + parse[node.test.constructor.name](node.test) + ")"
+
+		return result
+	},
+
 	VariableDeclaration(node)
 	{
 		const decls = node.decls
@@ -471,7 +508,7 @@ const parse =
 		const declName = parse[node.id.constructor.name](node.id)
 
 		if(node.expr) {
-			const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ = ${parse[node.expr.constructor.name](node.expr)}`
+			const result = `${declName}${parseType(node.valueType)} = ${parse[node.expr.constructor.name](node.expr)}`
 			return result
 		}
 
@@ -496,7 +533,7 @@ const parse =
 			result = "function"
 		}
 
-		result += `${funcName}(${parse.Args(node.params)}) ${parse.BlockStatement(node.body)}`
+		result += `${funcName}(${parse.Args(node.params)})${parseType(node.returnType)} ${parse.BlockStatement(node.body)}`
 
 		return result
 	},
@@ -507,10 +544,16 @@ const parse =
 
 		let node = args[0]
 		let result = parse[node.constructor.name](node)
+		if(!node.simple) {
+			result += parseType(node.valueType)
+		}
 
 		for(let n = 1; n < args.length; n++) {
 			node = args[n]
 			result += ", " + parse[node.constructor.name](node)
+			if(!node.simple) {
+				 result += parseType(node.valueType)
+			}
 		}
 
 		return result
@@ -519,14 +562,6 @@ const parse =
 	Program(node) {
 		return parse.BlockStatement(node)
 	}
-}
-
-function compile_Bool(node) {
-	return node.value ? "true" : "false";
-}
-
-function compile_String(node) {
-	return node.raw;
 }
 
 function compile_New(node)
@@ -580,7 +615,7 @@ const AssignmentExpression = function(node)
 {
 	const declName = doCompileLookup(node.left)
 
-	const result = `${declName}/*:${ValueTypeStr[node.valueType]}*/ ${node.operator} ${doCompileLookup(node.right)}`
+	const result = `${declName}${parseType(node.valueType)} ${node.operator} ${doCompileLookup(node.right)}`
 	return result	
 }
 
@@ -758,35 +793,6 @@ function compile_SwitchCase(node)
 	return result;
 }
 
-function compile_Break(node) {
-	const output = node.label ? `break ${compile_Identifier(node.label)}` : "break"
-	return output;
-}
-
-
-
-function compile_While(node)
-{
-	if(node.body instanceof AST.EmptyStatement) {
-		return "";
-	}
-
-	let result = "while(" +
-		doCompileLookup(node.test) + ") " +
-		doCompileLookup(node.body);
-
-	return result;
-}
-
-function compile_DoWhile(node)
-{
-	let result = "do " +
-		doCompileLookup(node.body) +
-		" while(" + doCompileLookup(node.test) + ")";
-
-	return result;
-}
-
 function compile_Continue(node) {
 	return "continue";
 }
@@ -899,6 +905,15 @@ function compile_Import(node)
 	}
 
 	return result;
+}
+
+const parseType = function(type) 
+{
+	if(commentType) {
+		return `/*:${ValueTypeStr[type]}*/`
+	}
+
+	return `:${ValueTypeStr[type]}`
 }
 
 function compile_Specifiers(specifiers)

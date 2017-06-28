@@ -1,4 +1,4 @@
-const AST = require("../AST")
+const AST = require("../ast")
 const { ValueType, ValueTypeStr } = require("../types")
 const logger = require("../../logger")
 
@@ -26,6 +26,8 @@ const parse =
 			logger.logError("IdentifierError:", `‘${node.value}’ was not declared in this scope`)
 			return 0
 		}
+
+		node.ref = variable
 		
 		return variable.valueType
 	},
@@ -36,34 +38,19 @@ const parse =
 		activeScope = node.scope
 
 		const body = node.scope.body
-		for(let n = 0; n < body.length; n++) {
+		for(let n = 0; n < body.length; n++) 
+		{
 			const bodyNode = body[n]
-			parse[bodyNode.type](bodyNode)
+
+			if(bodyNode instanceof AST.FunctionDeclaration) {
+				parse.FunctionDefinition(bodyNode)
+				continue
+			}
+			
+			parse[bodyNode.constructor.name](bodyNode)
 		}
 
 		activeScope = prevScope
-	},
-
-	Variable(node) 
-	{
-		const exprValueType = parse[node.expr.type](node.expr)
-
-		if(node.valueType !== ValueType.Dynamic && node.valueType !== exprValueType) {
-			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[node.valueType]}' to '${ValueTypeStr[exprValueType]}'`)
-			return
-		}
-
-		node.valueType = exprValueType
-	},
-
-	VariableDeclaration(node)
-	{
-		const decls = node.decls
-		for(let n = 0; n < decls.length; n++) {
-			const decl = decls[n]
-			parse[decl.type](decl)
-			activeScope.vars[decl.id.value] = decl
-		}
 	},
 
 	AssignmentExpression(node) 
@@ -115,11 +102,30 @@ const parse =
 		parse.BlockDeclaration(node.consequent)
 	},
 
-	FunctionDeclaration(node) 
+	VariableDeclaration(node)
 	{
-		const prevActiveFunc = activeFunc
-		activeFunc = node
+		const decls = node.decls
+		for(let n = 0; n < decls.length; n++) {
+			const decl = decls[n]
+			parse[decl.type](decl)
+			activeScope.vars[decl.id.value] = decl
+		}
+	},
 
+	Variable(node) 
+	{
+		const exprValueType = parse[node.expr.type](node.expr)
+
+		if(node.valueType !== ValueType.Dynamic && node.valueType !== exprValueType) {
+			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[node.valueType]}' to '${ValueTypeStr[exprValueType]}'`)
+			return
+		}
+
+		node.valueType = exprValueType
+	},
+
+	FunctionDefinition(node)
+	{
 		const scopeNode = activeScope.vars[node.id.value]
 		if(scopeNode) {
 			logger.logError("Error", `redeclaration of ${node.id.value}:${node.returnType}`)
@@ -127,6 +133,12 @@ const parse =
 		}
 
 		activeScope.vars[node.id.value] = node
+	},
+
+	FunctionDeclaration(node) 
+	{
+		const prevActiveFunc = activeFunc
+		activeFunc = node
 
 		const prevScope = activeScope
 		activeScope = node.body.scope
@@ -136,6 +148,8 @@ const parse =
 		parse.BlockDeclaration(node.body)
 
 		activeFunc = prevActiveFunc
+
+		node.resolved = true
 	},
 
 	Params(params)
@@ -146,21 +160,28 @@ const parse =
 		}
 	},
 
+	ExpressionStatement(node) {
+		return parse[node.expr.constructor.name](node.expr)
+	},
+
 	ReturnStatement(node) 
 	{
 		if(node.arg) 
 		{
-			parse[node.arg.type](node.arg)
+			const valueType = parse[node.arg.type](node.arg)
 
 			const funcReturnType = activeFunc.returnType
-			if(funcReturnType !== node.arg.valueType) 
+			if(funcReturnType !== valueType) 
 			{
-				if(funcReturnType !== ValueType.None && funcReturnType !== ValueType.Dynamic) {
-					logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[funcReturnType]}' to '${ValueTypeStr[node.arg.valueType]}'`)
+				if(valueType === ValueType.Dynamic) {
+					node.arg.ref.valueType = funcReturnType
+				}
+				else if(funcReturnType === ValueType.Dynamic) {
+					node.valueType = valueType
+					activeFunc.returnType = valueType
 				}
 				else {
-					node.valueType = node.arg.valueType
-					activeFunc.returnType = node.arg.valueType
+					logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[funcReturnType]}' to '${ValueTypeStr[node.arg.valueType]}'`)
 				}
 			}
 
@@ -183,20 +204,33 @@ const parse =
 	CallExpression(node)
 	{
 		const func = getFromIdentifier(node.callee)
-		node.valueType = func.returnType
 
 		if(node.arguments) {
-			parse.Arguments(node.arguments)
+			parse.Arguments(func.params, node.arguments)
 		}
+
+		if(!func.resolved) {
+			parse.FunctionDeclaration(func)
+		}
+
+		node.valueType = func.returType
 
 		return func.returnType
 	},
 
-	Arguments(args)
+	Arguments(params, args)
 	{
 		for(let n = 0; n < args.length; n++) {
 			const arg = args[n]
-			parse[arg.type](arg)
+			const param = params[n]
+			const valueType = parse[arg.type](arg)
+
+			if(param.ref.valueType === ValueType.Dynamic) {
+				param.ref.valueType = valueType
+			}
+			else if(param.valueType !== valueType) {
+				logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[param.valueType]}' to '${ValueTypeStr[valueType]}'`)
+			}
 		}
 	},
 
