@@ -36,13 +36,13 @@ class Identifier
 
 class Number
 {
-	constructor(value) 
+	constructor() 
 	{
 		this.type = "Number"
 		this.start = 0
 		this.end = 0
 
-		this.value = value
+		this.value = 0
 		this.valueType = ValueType.Number
 		this.simple = true
 	}
@@ -50,25 +50,29 @@ class Number
 
 class Bool
 {
-	constructor(value) {
+	constructor() 
+	{
 		this.type = "Bool"
-		this.valueType = ValueType.Number
-		this.value = value
 		this.start = 0
 		this.end = 0
+
+		this.value = 0
+		this.valueType = ValueType.Number
 		this.simple = true
 	}
 }
 
 class String
 {
-	constructor(value, raw) {
+	constructor() 
+	{
 		this.type = "String"
-		this.value = value
-		this.valueType = ValueType.String
-		this.raw = raw
 		this.start = 0
 		this.end = 0
+
+		this.value = value
+		this.raw = raw
+		this.valueType = ValueType.String
 		this.simple = true
 	}
 }

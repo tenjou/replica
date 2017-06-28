@@ -11,6 +11,38 @@ const switchLabel = { kind: "switch" }
 
 const parse =
 {
+	Literal(value) 
+	{
+		const raw = context.input.slice(context.start, context.end)
+
+		let node
+		if(typeof value === "string") {
+			node = startNode(AST.String)
+			node.value = value
+			node.raw = raw
+		}
+		else 
+		{
+			if(raw === "false") {
+				node = startNode(AST.Bool)
+			}
+			else if(raw === "true") {
+				node = startNode(AST.Bool)
+				node.value = 1
+			}
+			else if(raw === "null") {
+				node = startNode(AST.Null)
+			}
+			else {
+				node = startNode(AST.Number)
+				node.value = value
+			}
+		}
+
+		next()
+		return node
+	},
+
 	Identifier(liberal) 
 	{
 		const node = startNode(AST.Identifier)
@@ -998,27 +1030,25 @@ pp.parseExprAtom = function (refShorthandDefaultPos) {
 			return id
 		}
 
-		case _tokentype.types.regexp:
-			var value = this.value;
-			node = this.parseLiteral(value.value);
-			node.regex = { pattern: value.pattern, flags: value.flags };
+		case tokenTypes.regexp:
+			const value = this.value
+			node = parse.Literal(value.value)
+			node.regex = { pattern: value.pattern, flags: value.flags }
 			return node;
 
-		case _tokentype.types.num:case _tokentype.types.string:
-			return this.parseLiteral(this.value);
+		case tokenTypes.num:
+		case tokenTypes.string:
+			return parse.Literal(this.value)
 
-		case _tokentype.types._null:
-			node = new AST.Null();
-			this.next();
-			node.start = this.start;
-			node.end = this.lastTokEnd;
-			return node;
+		case tokenTypes._null:
+			node = startNode(AST.Null)
+			next()
+			return node
 
-		case _tokentype.types._true:
-		case _tokentype.types._false:
-			node = new AST.Bool(this.type === _tokentype.types._true);
-			node.start = this.start;
-			node.end = this.lastTokEnd;
+		case tokenTypes._true:
+		case tokenTypes._false:
+			node = startNode(AST.Bool)
+			node.value = (this.type === tokenTypes._true)
 			this.next();
 			return node;
 
@@ -1055,36 +1085,6 @@ pp.parseExprAtom = function (refShorthandDefaultPos) {
 		default:
 			this.unexpected();
 	}
-};
-
-pp.parseLiteral = function(value) 
-{
-	const raw = this.input.slice(this.start, this.end);
-
-	let node;
-	if(typeof value === "string") {
-		node = new AST.String(value, raw);
-	}
-	else 
-	{
-		if(raw === "false") {
-			node = new AST.Bool(0);
-		}
-		else if(raw === "true") {
-			node = new AST.Bool(1);
-		}
-		else if(raw === "null") {
-			node = new AST.Null;
-		}
-		else {
-			node = new AST.Number(value);
-		}
-	}
-
-	node.start = this.start;
-	node.end = this.lastTokEnd;
-	this.next();
-	return node;
 };
 
 pp.parseParenAndDistinguishExpression = function (canBeArrow) {
