@@ -27,15 +27,17 @@ const parse =
 		activeScope = node.scope
 
 		const body = node.scope.body
-		for(let n = 0; n < body.length; n++) {
+		for(let n = 0; n < body.length; n++) 
+		{
 			const bodyNode = body[n]
-			const resultNode = parse[bodyNode.constructor.name](bodyNode)
-			body[n] = resultNode
+			if(!bodyNode) { continue }
+
+			body[n] = parseNode(bodyNode)
 		}
 	},
 
 	Variable(node) {
-		node.expr = parse[node.expr.type](node.expr)
+		node.expr = parseNode(node.expr)
 		return node
 	},
 
@@ -44,7 +46,7 @@ const parse =
 		const decls = node.decls
 		for(let n = 0; n < decls.length; n++) {
 			const decl = decls[n]
-			parse[decl.type](decl)
+			parseNode(decl)
 		}
 
 		return node
@@ -52,8 +54,8 @@ const parse =
 
 	Expression(node)
 	{
-		const leftNode = parse[node.left.type](node.left)
-		const rightNode = parse[node.right.type](node.right)
+		const leftNode = parseNode(node.left)
+		const rightNode = parseNode(node.right)
 
 		if(leftNode.type === "BinaryExpression" && rightNode.simple && leftNode.right.simple) 
 		{
@@ -89,12 +91,16 @@ const parse =
 	},
 
 	AssignmentExpression(node) {
-		node.right = parse[node.right.type](node.right)
+		node.right = parseNode(node.right)
 		return node
 	},
 
 	BinaryExpression(node) {
 		return parse.Expression(node)
+	},
+
+	FunctionExpression(node) {
+		return parse.FunctionDeclaration(node)
 	},
 
 	IfStatement(node)
@@ -133,6 +139,10 @@ const parse =
 	ExportDefaultDeclaration(node) {
 		return node
 	}
+}
+
+const parseNode = (node) => {
+	return parse[node.constructor.name](node)
 }
 
 module.exports = {

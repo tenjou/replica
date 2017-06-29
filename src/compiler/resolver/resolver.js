@@ -44,10 +44,11 @@ const parse =
 
 			if(bodyNode instanceof AST.FunctionDeclaration) {
 				parse.FunctionDefinition(bodyNode)
+				body[n] = null
 				continue
 			}
 			
-			parse[bodyNode.constructor.name](bodyNode)
+			parseNode(bodyNode)
 		}
 
 		activeScope = prevScope
@@ -98,23 +99,43 @@ const parse =
 
 	IfStatement(node)
 	{
-		parse[node.test.type](node.test)
+		parseNode(node.test)
 		parse.BlockDeclaration(node.consequent)
 	},
 
 	VariableDeclaration(node)
 	{
+		let handled = 0
 		const decls = node.decls
-		for(let n = 0; n < decls.length; n++) {
+		for(let n = 0; n < decls.length; n++) 
+		{
 			const decl = decls[n]
-			parse[decl.type](decl)
-			activeScope.vars[decl.id.value] = decl
+			if(decl.expr instanceof AST.FunctionExpression) {
+				decl.expr.id = decl.id
+				decls[n] = null
+				activeScope.funcs[decl.id.value] = decl.expr
+			}
+			else {
+				handled++
+				parse[decl.type](decl)
+				activeScope.vars[decl.id.value] = decl
+			}
 		}
+
+		if(!handled) {
+			return null
+		}
+
+		return node
 	},
 
 	Variable(node) 
 	{
-		const exprValueType = parse[node.expr.type](node.expr)
+		if(node.expr instanceof AST.FunctionExpression) {
+			return null
+		}
+
+		const exprValueType = parseNode(node.expr)
 
 		if(node.valueType !== ValueType.Dynamic && node.valueType !== exprValueType) {
 			logger.logError("TypeError", `invalid conversion from '${ValueTypeStr[node.valueType]}' to '${ValueTypeStr[exprValueType]}'`)
@@ -122,6 +143,11 @@ const parse =
 		}
 
 		node.valueType = exprValueType
+	},
+
+	FunctionExpression(node)
+	{
+
 	},
 
 	FunctionDefinition(node)
@@ -133,6 +159,7 @@ const parse =
 		}
 
 		activeScope.vars[node.id.value] = node
+		activeScope.funcs[node.id.value] = node
 	},
 
 	FunctionDeclaration(node) 
@@ -168,7 +195,7 @@ const parse =
 	{
 		if(node.arg) 
 		{
-			const valueType = parse[node.arg.type](node.arg)
+			const valueType = parseNode(node.arg)
 
 			const funcReturnType = activeFunc.returnType
 			if(funcReturnType !== valueType) 
@@ -184,6 +211,8 @@ const parse =
 					logger.logError("TypeError", `invalid conversion for return value from '${ValueTypeStr[funcReturnType]}' to '${ValueTypeStr[node.arg.valueType]}'`)
 				}
 			}
+
+			activeFunc.returnValue = true
 
 			return node.arg.valueType
 		}
@@ -204,6 +233,11 @@ const parse =
 	CallExpression(node)
 	{
 		const func = getFromIdentifier(node.callee)
+		if(!(func instanceof AST.FunctionDeclaration || 
+		     func instanceof AST.FunctionExpression))
+		{
+			logger.logError("error", `'${node.callee.value}' cannot be used as a function`)	
+		}
 
 		if(node.arguments) {
 			parse.Arguments(func.params, node.arguments)
@@ -212,6 +246,8 @@ const parse =
 		if(!func.resolved) {
 			parse.FunctionDeclaration(func)
 		}
+
+		func.numCalled++
 
 		node.valueType = func.returType
 
@@ -240,6 +276,10 @@ const parse =
 	}
 }
 
+const parseNode = function(node) {
+	return parse[node.constructor.name](node)
+}
+
 const getName = function(node)
 {
 	switch(node.type)
@@ -251,7 +291,7 @@ const getName = function(node)
 	return null
 }
 
-const getFromIdentifier = function(node)
+const getFromIdentifier = (node) =>
 {
 	let scope = activeScope
 	while(scope) 

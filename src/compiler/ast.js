@@ -3,6 +3,8 @@ const { ValueType } = require("./types")
 function Scope() {
 	this.body = []
 	this.vars = {}
+	this.funcs = {}
+	this.objects = {}
 	this.parent = null
 	this.labelIndex = 0
 	this.tmpIndex = 0
@@ -100,7 +102,6 @@ class Variable
 		this.id = null
 		this.valueType = ValueType.Dynamic
 		this.expr = null
-		this.kind = null
 	}
 }
 
@@ -195,7 +196,6 @@ class FunctionDeclaration
 {
 	constructor() 
 	{
-		this.type = "FunctionDeclaration"
 		this.start = 0
 		this.end = 0
 
@@ -206,11 +206,16 @@ class FunctionDeclaration
 		this.generator = false
 		this.expression = false
 		this.resolved = false
+		this.numCalled = 0
+		this.returnValue = false
 
 		this.valueType = ValueType.Function
 		this.returnType = ValueType.Dynamic
 	}
 }
+
+class FunctionExpression extends FunctionDeclaration
+{}
 
 class Class
 {
@@ -592,6 +597,7 @@ module.exports = {
 	UpdateExpression,
 	New,
 	Null,
+	FunctionExpression,
 	FunctionDeclaration,
 	Class,
 	ClassBody,

@@ -270,7 +270,7 @@ const parse =
 		{
 			const node = startNodeAt(AST.AssignmentExpression, startPos, startLoc)
 			node.operator = context.value
-			node.left = (context.type === tokenTypes.eq) ? context.toAssignable(left) : left
+			node.left = (context.type === tokenTypes.eq) ? parse.toAssignable(left) : left
 			refShorthandDefaultPos.start = 0
 
 			checkLVal(left)
@@ -681,6 +681,97 @@ const parse =
 		return value
 	},
 
+	ParenArrowList(exprList) {
+		return parse.ArrowExpression(exprList)
+	},	
+
+	ArrowExpression(params) {
+		const node = startNode(AST.ArrowFunctionExpression, context.start, context.startLoc)
+		node.params = parse.toAssignableList(params, true)
+		parse.FunctionBody(node, true)
+		return finishNode(node)
+	},	
+
+	toAssignableList(exprList, isBinding) 
+	{
+		let end = exprList.length
+		if(end) 
+		{
+			let last = exprList[end - 1]
+			if(last && last.type === "RestElement") {
+				--end
+			} 
+			else if(last && last.type === "SpreadElement") {
+				last.type = "RestElement"
+				const arg = last.argument
+				parse.toAssignable(arg, isBinding)
+				if(arg.type !== "Identifier" && arg.type !== "MemberExpression" && arg.type !== "ArrayPattern") {
+					unexpected(arg.start)
+				}
+				--end
+			}
+		}
+
+		for(let n = 0; n < end; n++) {
+			const elt = exprList[i]
+			if(elt) {
+				parse.toAssignable(elt, isBinding)
+			}
+		}
+
+		return exprList
+	},
+
+	toAssignable(node, isBinding) 
+	{
+		if(!node) { return node }
+
+		switch(node.type) 
+		{
+			case "Identifier":
+			case "ObjectPattern":
+			case "ArrayPattern":
+			case "AssignmentPattern":
+				break
+
+			case "ObjectExpression":
+				node.type = "ObjectPattern";
+				for(let n = 0; n < node.properties.length; n++) {
+					const prop = node.properties[i]
+					if(prop.kind !== "init") {
+						context.raise(prop.key.start, "Object pattern can't contain getter or setter")
+					}
+					parse.toAssignable(prop.value, isBinding)
+				}
+				break
+
+			case "ArrayExpression":
+				node.type = "ArrayPattern"
+				parse.toAssignableList(node.elements, isBinding)
+				break
+
+			case "AssignmentExpression":
+				if(node.operator === "=") {
+					node.type = "AssignmentPattern"
+					delete node.operator
+				} 
+				else {
+					context.raise(node.left.end, "Only '=' operator can be used for specifying default value.")
+				}
+				break
+
+			case "ParenthesizedExpression":
+				node.expression = parse.toAssignable(node.expression, isBinding)
+				break;
+
+			case "MemberExpression":
+				if(!isBinding) { break }
+
+			default:
+				context.raise(node.start, "Assigning to rvalue")
+		}
+	},
+
 	Export() 
 	{
 		next()
@@ -1082,7 +1173,7 @@ pp.parseExprAtom = function (refShorthandDefaultPos) {
 		case _tokentype.types._function:
 			node = this.startNode();
 			this.next();
-			return this.parseFunction(node, false);
+			return parse.Function(false)
 
 		case _tokentype.types._class:
 			return this.parseClass(this.startNode(), false);
@@ -1135,7 +1226,7 @@ pp.parseParenAndDistinguishExpression = function (canBeArrow) {
 
 		if (canBeArrow && !this.canInsertSemicolon() && this.eat(_tokentype.types.arrow)) {
 			if (innerParenStart) this.unexpected(innerParenStart);
-			return this.parseParenArrowList(startPos, startLoc, exprList);
+			return parse.ParenArrowList(exprList)
 		}
 
 		if (!exprList.length) this.unexpected(this.lastTokStart);
@@ -1164,10 +1255,6 @@ pp.parseParenAndDistinguishExpression = function (canBeArrow) {
 
 pp.parseParenItem = function (item) {
 	return item;
-};
-
-pp.parseParenArrowList = function (startPos, startLoc, exprList) {
-	return this.parseArrowExpression(this.startNodeAt(startPos, startLoc), exprList);
 };
 
 // New's precedence is slightly tricky. It must allow its argument
@@ -1320,13 +1407,6 @@ pp.parseMethod = function (isGenerator) {
 };
 
 // Parse arrow function expression with given parameters.
-
-pp.parseArrowExpression = function (node, params) {
-	this.initFunction(node);
-	node.params = this.toAssignableList(params, true);
-	this.parseFunctionBody(node, true);
-	return this.finishNode(node, "ArrowFunctionExpression");
-};
 
 
 // Parses a comma-separated list of expressions, and returns them as
@@ -1748,77 +1828,6 @@ var pp = _state.Parser.prototype;
 
 // Convert existing expression atom to assignable pattern
 // if possible.
-
-pp.toAssignable = function (node, isBinding) {
-	if (this.options.ecmaVersion >= 6 && node) {
-		switch (node.type) {
-			case "Identifier":
-			case "ObjectPattern":
-			case "ArrayPattern":
-			case "AssignmentPattern":
-				break;
-
-			case "ObjectExpression":
-				node.type = "ObjectPattern";
-				for (var i = 0; i < node.properties.length; i++) {
-					var prop = node.properties[i];
-					if (prop.kind !== "init") this.raise(prop.key.start, "Object pattern can't contain getter or setter");
-					this.toAssignable(prop.value, isBinding);
-				}
-				break;
-
-			case "ArrayExpression":
-				node.type = "ArrayPattern";
-				this.toAssignableList(node.elements, isBinding);
-				break;
-
-			case "AssignmentExpression":
-				if (node.operator === "=") {
-					node.type = "AssignmentPattern";
-					delete node.operator;
-				} else {
-					this.raise(node.left.end, "Only '=' operator can be used for specifying default value.");
-				}
-				break;
-
-			case "ParenthesizedExpression":
-				node.expression = this.toAssignable(node.expression, isBinding);
-				break;
-
-			case "MemberExpression":
-				if (!isBinding) break;
-
-			default:
-				this.raise(node.start, "Assigning to rvalue");
-		}
-	}
-	return node;
-};
-
-// Convert list of expression atoms to binding list.
-
-pp.toAssignableList = function (exprList, isBinding) {
-	var end = exprList.length;
-	if (end) {
-		var last = exprList[end - 1];
-		if (last && last.type == "RestElement") {
-			--end;
-		} else if (last && last.type == "SpreadElement") {
-			last.type = "RestElement";
-			var arg = last.argument;
-			this.toAssignable(arg, isBinding);
-			if (arg.type !== "Identifier" && arg.type !== "MemberExpression" && arg.type !== "ArrayPattern") this.unexpected(arg.start);
-			--end;
-		}
-	}
-	for (var i = 0; i < end; i++) {
-		var elt = exprList[i];
-		if (elt) this.toAssignable(elt, isBinding);
-	}
-	return exprList;
-};
-
-// Parses spread element.
 
 pp.parseSpread = function (refShorthandDefaultPos) {
 	var node = this.startNode();

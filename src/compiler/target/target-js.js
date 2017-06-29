@@ -349,16 +349,31 @@ const parse =
 		return result
 	},
 
+	FunctionExpression(node) {
+		return parse.FunctionDeclaration(node)
+	},
+
 	BlockStatement(node, appendFunc)
 	{
 		incTabs()
 
 		let blockResult = ""
+		let funcResult = ""
+
+		const funcs = node.scope.funcs
+		for(let key in funcs) {
+			const funcNode = funcs[key]
+			if(funcNode.numCalled === 0) { continue }
+			funcResult += tabs + parse.FunctionDeclaration(funcNode) + "\n"
+		}
+
 		const body = node.scope.body
 		for(let n = 0; n < body.length; n++)
 		{
-			const node = body[n]
-			const nodeResult = parse[node.constructor.name](node)
+			const bodyNode = body[n]
+			if(!bodyNode) { continue }
+
+			const nodeResult = parseNode(bodyNode)
 			if(!nodeResult) { continue }
 
 			blockResult += tabs + nodeResult + "\n"
@@ -376,11 +391,11 @@ const parse =
 
 		if(numTabs)
 		{
-			if(!blockResult) {
+			if(!blockResult && !funcResult) {
 				return "{}"
 			}
 			else {
-				return "{\n" + blockResult + tabs + "}"
+				return `{\n${funcResult}${blockResult}${tabs}}`
 			}
 		}
 
@@ -505,10 +520,10 @@ const parse =
 
 	Variable(node)
 	{
-		const declName = parse[node.id.constructor.name](node.id)
+		const declName = parseNode(node.id)
 
 		if(node.expr) {
-			const result = `${declName}${parseType(node.valueType)} = ${parse[node.expr.constructor.name](node.expr)}`
+			const result = `${declName}${parseType(node.valueType)} = ${parseNode(node.expr)}`
 			return result
 		}
 
@@ -519,9 +534,12 @@ const parse =
 	{
 		if(!funcName)
 		{
-			funcName = parse[node.id.constructor.name](node.id)
-			if(funcName) {
-				funcName = " " + funcName
+			if(node.id)
+			{
+				funcName = parseNode(node.id)
+				if(funcName) {
+					funcName = " " + funcName
+				}
 			}
 		}
 		else {
@@ -533,7 +551,9 @@ const parse =
 			result = "function"
 		}
 
-		result += `${funcName}(${parse.Args(node.params)})${parseType(node.returnType)} ${parse.BlockStatement(node.body)}`
+		const returnType = node.returnValue ? parseType(node.returnType) : ""
+
+		result += `${funcName}(${parse.Args(node.params)})${returnType} ${parse.BlockStatement(node.body)}`
 
 		return result
 	},
@@ -562,6 +582,10 @@ const parse =
 	Program(node) {
 		return parse.BlockStatement(node)
 	}
+}
+
+const parseNode = (node) => {
+	return parse[node.constructor.name](node)
 }
 
 function compile_New(node)
