@@ -31,6 +31,11 @@ const createTimestamp = () => {
 		"]"
 }
 
+const raise = function(msg) {
+	const error = new Error(msg)
+	throw error
+}
+
 module.exports = {
-	logGreen, logYellow, logMagenta, logError, createTimestamp
+	logGreen, logYellow, logMagenta, logError, createTimestamp, raise
 }

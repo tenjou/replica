@@ -48,7 +48,10 @@ const parse =
 				continue
 			}
 			
-			parseNode(bodyNode)
+			const newBodyNode = parseNode(bodyNode)
+			if(bodyNode !== newBodyNode) {
+				body[n] = newBodyNode
+			}
 		}
 
 		activeScope = prevScope
@@ -97,6 +100,11 @@ const parse =
 		return node.valueType
 	},
 
+	ArrowFunctionExpression(node)
+	{
+
+	},
+
 	IfStatement(node)
 	{
 		parseNode(node.test)
@@ -110,9 +118,12 @@ const parse =
 		for(let n = 0; n < decls.length; n++) 
 		{
 			const decl = decls[n]
-			if(decl.expr instanceof AST.FunctionExpression) {
+			if(decl.expr instanceof AST.FunctionExpression ||
+			   decl.expr instanceof AST.ArrowFunctionExpression) 
+			{
 				decl.expr.id = decl.id
 				decls[n] = null
+				activeScope.vars[decl.id.value] = decl.expr
 				activeScope.funcs[decl.id.value] = decl.expr
 			}
 			else {
@@ -131,10 +142,6 @@ const parse =
 
 	Variable(node) 
 	{
-		if(node.expr instanceof AST.FunctionExpression) {
-			return null
-		}
-
 		const exprValueType = parseNode(node.expr)
 
 		if(node.valueType !== ValueType.Dynamic && node.valueType !== exprValueType) {
@@ -234,12 +241,21 @@ const parse =
 	{
 		const func = getFromIdentifier(node.callee)
 		if(!(func instanceof AST.FunctionDeclaration || 
-		     func instanceof AST.FunctionExpression))
+		     func instanceof AST.FunctionExpression ||
+			 func instanceof AST.ArrowFunctionExpression))
 		{
-			logger.logError("error", `'${node.callee.value}' cannot be used as a function`)	
+			logger.raise(`error: ${node.callee.value}' cannot be used as a function`)	
 		}
 
-		if(node.arguments) {
+		const params = func.params
+		const args = node.arguments
+
+		if(args) 
+		{
+			if(params.length < args.length) {
+				logger.raise(`error: too many arguments to function '${node.callee.value}'`)
+			}
+
 			parse.Arguments(func.params, node.arguments)
 		}
 
@@ -251,7 +267,7 @@ const parse =
 
 		node.valueType = func.returType
 
-		return func.returnType
+		return node
 	},
 
 	Arguments(params, args)
@@ -273,6 +289,10 @@ const parse =
 	ExportDefaultDeclaration(node) {
 		const scopeNode = parse[node.declaration.type](node.declaration)
 		return ValueType.None
+	},
+
+	XmlNode(node) {
+		return node
 	}
 }
 

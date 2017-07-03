@@ -8,6 +8,7 @@ function Scope() {
 	this.parent = null
 	this.labelIndex = 0
 	this.tmpIndex = 0
+	this.globalStr = null
 }
 
 class Program 
@@ -215,6 +216,9 @@ class FunctionDeclaration
 }
 
 class FunctionExpression extends FunctionDeclaration
+{}
+
+class ArrowFunctionExpression extends FunctionDeclaration
 {}
 
 class Class
@@ -526,17 +530,7 @@ class LogicalExpression
 	}
 }
 
-class ArrowFunctionExpression 
-{
-	constructor(params, expression, generator, body)
-	{
-		this.type = "ArrowFunctionExpression";
-		this.params = params;
-		this.expression = expression;
-		this.generator = generator;
-		this.body = body;
-	}
-}
+
 
 class TemplateLiteral 
 {
@@ -580,6 +574,21 @@ class AssignmentPattern
 		this.right = right
 	}
 }
+
+class XmlNode
+{
+	constructor() 
+	{
+		this.start = 0
+		this.end = 0
+
+		this.name = null
+		this.content = null
+		this.params = {}
+		this.body = []
+	}
+}
+
 
 module.exports = {
 	Scope,
@@ -636,5 +645,6 @@ module.exports = {
 	Property,
 	ObjectPattern,
 	AssignmentPattern,
-	ExportAllDeclaration
+	ExportAllDeclaration,
+	XmlNode,
 }

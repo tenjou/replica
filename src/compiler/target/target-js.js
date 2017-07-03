@@ -4,8 +4,9 @@ const path = require("path")
 const utils = require("../utils")
 const logger = require("../../logger")
 
-let tabs = "";
-let numTabs = 0;
+let tabs = ""
+let numTabs = 0
+let activeScope = null
 
 const context = {
 	currSourceFile: null,
@@ -355,6 +356,9 @@ const parse =
 
 	BlockStatement(node, appendFunc)
 	{
+		const prevScope = activeScope
+		activeScope = node.scope
+
 		incTabs()
 
 		let blockResult = ""
@@ -398,6 +402,8 @@ const parse =
 				return `{\n${funcResult}${blockResult}${tabs}}`
 			}
 		}
+
+		activeScope = prevScope
 
 		return blockResult
 	},
@@ -546,7 +552,8 @@ const parse =
 			funcName = " " + funcName
 		}
 
-		let result = ""
+		const scope = node.body.scope
+		let result = scope.globalStr ? scope.globalStr : ""
 		if(!withoutFunc) {
 			result = "function"
 		}
@@ -581,12 +588,58 @@ const parse =
 
 	Program(node) {
 		return parse.BlockStatement(node)
+	},
+
+	XmlNode(node) 
+	{
+		let params = ""
+
+		if(node.params) 
+		{
+			let first = true
+			let global = "const $wabi$0 = { "
+			
+			for(let key in node.params) 
+			{
+				if(first) {
+					first = false
+					global += `${key}: null`
+				}
+				else {
+					global += `, ${key}: null`
+				}
+
+				params += `$wabi$0.${key} = ${parseNode(node.params[key])}\n${tabs}`
+			}
+			global += " }\n"
+
+			activeScope.globalStr += global
+		}
+
+		let result = `${params}elementOpen(${node.name})\n`
+
+		incTabs()
+
+		if(node.content) {
+			result += `${tabs}text(${parseNode(node.content)})\n`
+		}
+
+		if(node.body.length > 0)
+		{
+			
+			for(let n = 0; n < node.body.length; n++) {
+				result += parse.XmlNode(node.body[n])
+			}
+		}
+
+		decTabs()
+
+		result += `${tabs}elementClose(${node.name})`
+		return result
 	}
 }
 
-const parseNode = (node) => {
-	return parse[node.constructor.name](node)
-}
+const parseNode = (node) => parse[node.constructor.name](node)
 
 function compile_New(node)
 {

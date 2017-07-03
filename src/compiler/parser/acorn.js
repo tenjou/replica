@@ -5,6 +5,7 @@ const { reservedWords } = require("./identifier")
 let context = null
 let tokenTypes = null
 let activeScope = null
+let customParsingContext = false
 
 const loopLabel = { kind: "loop" }
 const switchLabel = { kind: "switch" }
@@ -109,8 +110,10 @@ const parse =
 		return finishNode(node)
 	},
 
-	VariableDeclaration(node, kind) 
+	VariableDeclaration(kind) 
 	{
+		const node = startNode(AST.VariableDeclaration)
+
 		next()
 
 		node.kind = kind.keyword
@@ -260,7 +263,7 @@ const parse =
 			context.potentialArrowAt = context.start
 		}
 
-		const left = context.parseMaybeConditional(noIn, refShorthandDefaultPos)
+		let left = context.parseMaybeConditional(noIn, refShorthandDefaultPos)
 
 		if(afterLeftParse) {
 			left = afterLeftParse.call(context, left, startPos, startLoc)
@@ -387,10 +390,8 @@ const parse =
 			case tokenTypes._let:
 			case tokenTypes._const:
 				if(!declaration) { unexpected() }
-			case tokenTypes._var: {
-				const node = startNode(AST.VariableDeclaration)
-				return parse.VariableDeclaration(node, startType)
-			}
+			case tokenTypes._var: 
+				return parse.VariableDeclaration(startType)
 
 			case tokenTypes._while:
 				return context.parseWhileStatement(node)
@@ -403,6 +404,13 @@ const parse =
 			case tokenTypes._export:
 			case tokenTypes._import:
 				return (startType === tokenTypes._import) ? context.parseImport(node) : parse.Export(node)
+
+			case tokenTypes.relational: {
+				customParsingContext = true
+				const node = parse.Xml()
+				customParsingContext = false
+				return node
+			}
 
 			default:
 			{
@@ -713,7 +721,7 @@ const parse =
 		}
 
 		for(let n = 0; n < end; n++) {
-			const elt = exprList[i]
+			const elt = exprList[n]
 			if(elt) {
 				parse.toAssignable(elt, isBinding)
 			}
@@ -832,7 +840,121 @@ const parse =
 		}
 
 		return finishNode(node)
-	}	
+	},
+
+	Xml(parent)
+	{
+		if(context.value !== "<") {
+			unexpected()
+		}
+
+		next()
+		if(context.type === tokenTypes.slash) 
+		{
+			if(!parent) {
+				unexpected()
+			}
+
+			next()
+			if(context.type !== tokenTypes.name || 
+			   parent.name !== context.value) 
+			{
+				unexpected()
+			}
+
+			next()
+			if(context.type === tokenTypes.relational) {
+				if(context.value !== ">") {
+					unexpected()
+				}
+			}
+
+			next()
+			return
+		}
+
+		const node = startNode(AST.XmlNode)
+		
+		if(parent) {
+			parent.body.push(node)
+		}
+		if(context.type !== tokenTypes.name) {
+			unexpected()
+		}
+
+		node.name = context.value
+
+		next()
+
+		// Parse attributes if there is any:
+		while(context.type === tokenTypes.name) 
+		{
+			const name = context.value
+
+			next()
+			if(!eat(tokenTypes.eq)) {
+				unexpected()
+			}
+			if(!eat(tokenTypes.quote)) {
+				unexpected()
+			}
+
+			if(eat(tokenTypes.braceL)) 
+			{
+				const value = parse.Statement()
+				node.params[name] = value
+
+				if(!eat(tokenTypes.braceR)) {
+					unexpected()
+				}
+			}
+			else if(context.type === tokenTypes.name) {
+				const stringNode = startNode(AST.String)
+				stringNode.value = context.value
+				stringNode.raw = `"${context.value}"`
+				node.params[name] = stringNode
+				next()
+			}
+			else {
+				unexpected()
+			}
+
+			if(!eat(tokenTypes.quote)) {
+				unexpected()
+			}
+		}
+
+		// Parse tail:
+		if(context.type === tokenTypes.relational) 
+		{
+			if(context.value !== ">") {
+				unexpected()
+			}
+
+			next()
+			if(eat(tokenTypes.braceL)) 
+			{
+				node.content = parse.Statement()
+
+				if(!eat(tokenTypes.braceR)) {
+					unexpect()
+				}
+			}
+
+			parse.Xml(node)
+		}
+		else if(context.type === tokenTypes.slash) 
+		{
+			next()
+			if(context.type === tokenTypes.relational) {
+				if(context.value !== ">") {
+					unexpected()
+				}
+			}
+		}
+
+		return finishNode(node)
+	}
 }
 
 const checkLVal = function(expr, isBinding, checkClashes) 
@@ -1184,6 +1306,13 @@ pp.parseExprAtom = function (refShorthandDefaultPos) {
 		case _tokentype.types.backQuote:
 			return this.parseTemplate();
 
+		case tokenTypes.relational: {
+			customParsingContext = true
+			const node = parse.Xml()
+			customParsingContext = false
+			return node
+		}
+
 		default:
 			this.unexpected();
 	}
@@ -1217,7 +1346,7 @@ pp.parseParenAndDistinguishExpression = function (canBeArrow) {
 				if (this.type === _tokentype.types.parenL && !innerParenStart) {
 					innerParenStart = this.start;
 				}
-				exprList.push(this.parseMaybeAssign(false, refShorthandDefaultPos, this.parseParenItem));
+				exprList.push(parse.Assign(false, refShorthandDefaultPos, this.parseParenItem));
 			}
 		}
 		var innerEndPos = this.start,
@@ -1744,7 +1873,9 @@ pp.raise = function (pos, message) {
 	var loc = _locutil.getLineInfo(this.input, pos);
 	message += " (" + loc.line + ":" + loc.column + ")";
 	var err = new SyntaxError(message);
-	err.pos = pos;err.loc = loc;err.raisedAt = this.pos;
+	err.pos = pos;
+	err.loc = loc;
+	err.raisedAt = this.pos;
 	throw err;
 };
 
@@ -2192,7 +2323,7 @@ var Parser = (function () {
 
 		this.options = _options.getOptions(options);
 		this.sourceFile = this.options.sourceFile;
-		this.isKeyword = _identifier.keywords[this.options.ecmaVersion >= 6 ? 6 : 5];
+		this.isKeyword = _identifier.keywords[6]
 		this.isReservedWord = _identifier.reservedWords[this.options.ecmaVersion];
 		this.input = String(input);
 
@@ -2826,7 +2957,7 @@ pp.nextToken = function () {
 pp.readToken = function (code) {
 	// Identifier or keyword. '\uXXXX' sequences are allowed in
 	// identifiers, so '\' also dispatches to that.
-	if (_identifier.isIdentifierStart(code, this.options.ecmaVersion >= 6) || code === 92 /* '\' */) return this.readWord();
+	if (_identifier.isIdentifierStart(code, true) || code === 92 /* '\' */) return this.readWord();
 
 	return this.getTokenFromCode(code);
 };
@@ -2950,8 +3081,11 @@ pp.readToken_dot = function () {
 	}
 };
 
-pp.readToken_slash = function () {
-	// '/'
+pp.readToken_slash = function() 
+{
+	if(customParsingContext) {
+		return this.finishOp(tokenTypes.slash, 1);
+	}
 	var next = this.input.charCodeAt(this.pos + 1);
 	if (this.exprAllowed) {
 		++this.pos;return this.readRegexp();
@@ -3081,9 +3215,17 @@ pp.getTokenFromCode = function (code) {
 			return this.readNumber(false);
 
 		// Quotes produce strings.
-		case 34:case 39:
+		case 34:
+		case 39: {
 			// '"', "'"
-			return this.readString(code);
+			if(customParsingContext) {
+				this.pos++
+				return this.finishToken(tokenTypes.quote, 1)
+			}
+			return this.readString(code)
+		}
+			
+			
 
 		// Operators are parsed inline in tiny state machines. '=' (61) is
 		// often referred to. `finishOp` simply skips the amount of
@@ -3458,10 +3600,17 @@ pp.readWord1 = function () {
 // Read an identifier or keyword token. Will check for reserved
 // words when necessary.
 
-pp.readWord = function () {
-	var word = this.readWord1();
-	var type = _tokentype.types.name;
-	if ((this.options.ecmaVersion >= 6 || !this.containsEsc) && this.isKeyword(word)) type = _tokentype.keywords[word];
+pp.readWord = function() 
+{
+	const word = this.readWord1()
+	let type = tokenTypes.name
+
+	if(!customParsingContext) {
+		if(!this.containsEsc && this.isKeyword(word)) {
+			type = _tokentype.keywords[word]
+		}
+	}
+
 	return this.finishToken(type, word);
 };
 
@@ -3558,6 +3707,7 @@ var types = {
 	assign: new TokenType("_=", { beforeExpr: true, isAssign: true }),
 	incDec: new TokenType("++/--", { prefix: true, postfix: true, startsExpr: true }),
 	prefix: new TokenType("prefix", { beforeExpr: true, prefix: true, startsExpr: true }),
+	quote: new TokenType('"'),
 	logicalOR: binop("||", 1),
 	logicalAND: binop("&&", 2),
 	bitwiseOR: binop("|", 3),

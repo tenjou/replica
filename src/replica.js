@@ -523,7 +523,7 @@ console.log();
 
 process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-  'index.ts',
+  'index.jsx',
   '-i',
   'index.html'];
 

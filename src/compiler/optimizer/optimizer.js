@@ -138,6 +138,10 @@ const parse =
 
 	ExportDefaultDeclaration(node) {
 		return node
+	},
+
+	XmlNode(node) {
+		return node
 	}
 }
 

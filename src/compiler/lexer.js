@@ -80,6 +80,7 @@ class SourceFile
 		switch(this.extname)
 		{
 			case ".js":
+			case ".jsx":
 			case ".ts":
 			{
 				let node = null;
