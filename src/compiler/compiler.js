@@ -967,8 +967,13 @@ function compile_Specifiers(specifiers)
 	return result;
 }
 
-function compile_Specifier(node) {
-	return node.localAs ? doCompileLookup(node.localAs) : doCompileLookup(node.local)
+function compile_Specifier(node) 
+{
+	if(node.localAs) {
+		return doCompileLookup(node.localAs) + ": " + doCompileLookup(node.local)
+	}
+	
+	return doCompileLookup(node.local)
 }
 
 function compile_Export(node)
