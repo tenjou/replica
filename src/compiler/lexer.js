@@ -605,7 +605,8 @@ function parse_DoWhileStatement(node)
 
 function parse_ContinueStatement(node)
 {
-	const continueStatement = new AST.Continue();
+	const label = node.label ? doLookup(node.label) : null
+	const continueStatement = new AST.Continue(label)
 	return continueStatement;
 }
 

@@ -523,7 +523,7 @@ console.log();
 //   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
 //   'src/index.js',
 //   '-i',
-//   'index.html', "-s", "-u", "-si"];
+//   'index.html', "-s", "8080", "8091", "-l", "../../engine meta"];
 
 cli.name(package.name)
    .version(package.version)

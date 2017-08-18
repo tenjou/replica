@@ -834,12 +834,15 @@ function compile_DoWhile(node)
 }
 
 function compile_Continue(node) {
-	return "continue";
+	if(node.label) {
+		return `continue ${doCompileLookup(node.label)}`
+	}
+	return "continue"
 }
 
 function compile_Label(node)
 {
-	let result = doCompileLookup(node.name) + ": " +
+	let result = doCompileLookup(node.name) + `:\n${tabs}` +
 		doCompileLookup(node.body);
 
 	return result;

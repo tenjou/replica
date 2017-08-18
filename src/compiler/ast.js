@@ -306,8 +306,9 @@ class DoWhile
 
 class Continue
 {
-	constructor() {
-		this.type = "Continue";
+	constructor(label) {
+		this.type = "Continue"
+		this.label = label
 	}
 }
 
