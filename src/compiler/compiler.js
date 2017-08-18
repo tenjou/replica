@@ -792,13 +792,13 @@ function compile_Break(node) {
 
 function compile_For(node)
 {
-	let result = "for(" +
-		doCompileLookup(node.init) + "; " +
-		doCompileLookup(node.test) + "; " +
-		doCompileLookup(node.update) + ") " +
-		doCompileLookup(node.body);
+	const init = node.init ? doCompileLookup(node.init) : "" 
+	const test = node.test ? "; " + doCompileLookup(node.test) : ";"
+	const update = node.update ? "; " + doCompileLookup(node.update) : ";"
+	const body = doCompileLookup(node.body)
 
-	return result;
+	const result = `for(${init}${test}${update}) ${body}`
+	return result
 }
 
 function compile_ForIn(node)
