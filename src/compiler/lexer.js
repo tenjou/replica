@@ -896,6 +896,11 @@ const parse_AssignmentPattern = (node) => {
 	return assignmentPattern
 }
 
+const parse_DebuggerStatement = (node) => {
+	const debuggerStatement = new AST.DebuggerStatement()
+	return debuggerStatement
+}
+
 function doLookup(node) {
 	return node ? lookup[node.type](node) : null
 }
@@ -950,7 +955,8 @@ const lookup = {
 	ObjectPattern: parse_ObjectPattern,
 	Property: parse_Property,
 	AssignmentPattern: parse_AssignmentPattern,
-	ExportAllDeclaration: parse_ExportAllDeclaration
+	ExportAllDeclaration: parse_ExportAllDeclaration,
+	DebuggerStatement: parse_DebuggerStatement
 };
 
 module.exports = {

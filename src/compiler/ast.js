@@ -461,6 +461,8 @@ class AssignmentPattern
 	}
 }
 
+class DebuggerStatement {}
+
 module.exports = {
 	Identifier,
 	Number,
@@ -511,5 +513,6 @@ module.exports = {
 	Property,
 	ObjectPattern,
 	AssignmentPattern,
-	ExportAllDeclaration
+	ExportAllDeclaration,
+	DebuggerStatement
 }

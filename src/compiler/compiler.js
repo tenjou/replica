@@ -1280,6 +1280,10 @@ const compile_AssignmentPattern = (node) => {
 	return result
 }
 
+const compile_DebuggerStatement = (node) => {
+	return "debugger"
+}
+
 function incTabs()
 {
 	numTabs++;
@@ -1343,7 +1347,8 @@ const compileLookup = {
 	ExportDefaultDeclaration: compile_ExportDefaultDeclaration,
 	ExportAllDeclaration: compile_ExportAllDeclaration,
 	ObjectPattern: compile_ObjectPattern,
-	AssignmentPattern: compile_AssignmentPattern
+	AssignmentPattern: compile_AssignmentPattern,
+	DebuggerStatement: compile_DebuggerStatement
 }
 
 module.exports = {
