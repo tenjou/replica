@@ -632,7 +632,7 @@ function compile_Return(node)
 {
 	let content = doCompileLookup(node.arg);
 	let result = "return";
-	if(content) {
+	if(content !== null) {
 		result += " " + content;
 	}
 
