@@ -521,9 +521,9 @@ console.log();
 
 // process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
 //   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'src/index.js',
+//   'src/main.js',
 //   '-i',
-//   'index.html', "-s", "8080", "8091", "-l", "../../engine meta", "-si"];
+//   'index.html'];
 
 cli.name(package.name)
    .version(package.version)
