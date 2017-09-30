@@ -295,7 +295,7 @@ function getNameFromNode(node)
 }
 
 const lookup = (node) => {
-	if(!node) { return null }
+	if(!node) { return "" }
 	return compile[node.constructor.name](node)
 }
 
