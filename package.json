@@ -1,6 +1,6 @@
 {
   "name": "build-replica",
-  "version": "0.2.48",
+  "version": "0.2.49",
   "description": "Fast ECMA6 JavaScript build tool that is usable through CLI, seamless incremental compilation and developmen server with hot reload for rapid development.",
   "author": "Arturs Šefers <arthur.der.shefer@gmail.com>",
   "main": "src/replica.js",
