@@ -1159,7 +1159,7 @@ const compile =
 	{
 		const body = lookup(node.body)
 		let result = "(" + this.Args(node.params) + ") => "
-		if(body instanceof AST.Block) {
+		if(node.body instanceof AST.Block) {
 			result += body
 		}
 		else {
