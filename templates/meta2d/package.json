@@ -1,0 +1,16 @@
+{
+	"name": "untitled",
+	"version": "0.1.0",
+	"description": "",
+	"author": "",
+	"main": "src/index.js",
+	"scripts": {
+		"build": "build-replica src/index.js -i index.html -t -u",
+		"dev": "build-replica src/index.js -i index.html -t -s"
+	},
+	"dependencies": {
+		"meta2d": "*"
+	},
+	"keywords": [],
+	"license": "MIT"
+}
