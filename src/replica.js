@@ -421,12 +421,12 @@ function copyFiles(targetDir, srcDir, onDone, silent)
 	switch(os.platform())
 	{
 		case "win32":
-			cmd = `xcopy ${absoluteSrcDir} ${absoluteTargetDir} /s /e`;
+			cmd = `xcopy "${absoluteSrcDir}" "${absoluteTargetDir}" /s /e`;
 			break;
 
 		case "darwin":
 		case "linux":
-			cmd = `cp -r ${absoluteTargetDir}/* ${absoluteSrcDir}`;
+			cmd = `cp -r "${absoluteTargetDir}/*" "${absoluteSrcDir}"`;
 			break;	
 	}
 
@@ -521,7 +521,7 @@ console.log();
 
 // process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
 //   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'src/main.js',
+//   'src/index.js',
 //   '-i',
 //   'index.html'];
 
