@@ -1,26 +1,27 @@
-const exec = require("child_process").exec;
-const os = require("os");
-const fs = require("fs");
-const path = require("path");
-const childProcess = require("child_process");
-const uglifyJS = require("uglify-js");
-const watcher = require("./watcher");
-const lexer = require("./compiler/lexer");
-const server = require("./server/server");
-const package = require("../package.json");
-const cli = require("./cli");
-const utils = require("./logger");
+const exec = require("child_process").exec
+const os = require("os")
+const fs = require("fs")
+const path = require("path")
+const childProcess = require("child_process")
+const uglifyJS = require("uglify-js")
+const watcher = require("./watcher")
+const lexer = require("./compiler/lexer")
+const server = require("./server/server")
+const package = require("../package.json")
+const cli = require("./cli")
+const utils = require("./logger")
+const entry = require("./entry.js")
 
 const needUpdate = {
 	indexFile: false,
 	files: false
-};
+}
 
-const indexFiles = {};
-let filesChanged = {};
-let packageSrc = "./package.js";
-let buildSrc = "./build/";
-let entrySourceFile = null;
+const indexFiles = {}
+let filesChanged = {}
+let packageSrc = "./package.js"
+let buildSrc = "./build/"
+let entrySourceFile = null
 
 watcher.setEventListener((type, dir, file) => 
 {
@@ -454,6 +455,8 @@ function setEntry(src)
 	if(!fs.existsSync(entryPath)) {
 		return utils.logError("EntryError", "File not found: " + src);
 	}
+
+	entry.path = path.dirname(entryPath)
 
 	utils.logGreen("Entry", entryPath);
 

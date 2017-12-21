@@ -4,6 +4,7 @@ const acorn = require("./acorn.js");
 const AST = require("./ast.js");
 const compiler = require("./compiler.js");
 const logger = require("../logger");
+const entry = require("../entry.js");
 
 const ctx = {
 	sourceFiles: {},
@@ -712,9 +713,12 @@ function parse_ImportDeclaration(node, exported)
 	{
 		if(firstSymbol === "~") {
 			moduleName = moduleName.slice(2)
+			fullPath = path.resolve(entry.path, moduleName)
 		}
-
-		fullPath = path.resolve(ctx.currSourceFile.rootPath, moduleName);
+		else {
+			fullPath = path.resolve(ctx.currSourceFile.rootPath, moduleName)
+		}
+		
 		if(path.extname(fullPath) === "") {
 			fullPath += ".js";
 		}
