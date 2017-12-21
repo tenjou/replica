@@ -658,10 +658,11 @@ function parse_ImportDeclaration(node, exported)
 		specifiers = null
 	}
 
-	const moduleName = source.value;
-
 	let fullPath;
-	if(moduleName[0] !== ".")
+	let moduleName = source.value;
+	const firstSymbol = moduleName[0]
+	
+	if(firstSymbol !== "." && firstSymbol !== "~")
 	{
 		let modulePath;
 		let custom;
@@ -709,6 +710,10 @@ function parse_ImportDeclaration(node, exported)
 	}
 	else
 	{
+		if(firstSymbol === "~") {
+			moduleName = moduleName.slice(2)
+		}
+
 		fullPath = path.resolve(ctx.currSourceFile.rootPath, moduleName);
 		if(path.extname(fullPath) === "") {
 			fullPath += ".js";
