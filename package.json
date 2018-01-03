@@ -9,7 +9,7 @@
   },
   "engineStrict": true,
   "dependencies": {
-    "uglify-js": "*",
+    "uglify-es": "*",
     "ws": "^1.1.1"
   },
   "repository": {

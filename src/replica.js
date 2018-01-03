@@ -3,7 +3,7 @@ const os = require("os")
 const fs = require("fs")
 const path = require("path")
 const childProcess = require("child_process")
-const uglifyJS = require("uglify-js")
+const uglifyJS = require("uglify-es")
 const watcher = require("./watcher")
 const lexer = require("./compiler/lexer")
 const server = require("./server/server")
@@ -524,9 +524,9 @@ console.log();
 
 // process.argv = [ 'C:\\Program Files\\nodejs\\node.exe',
 //   'C:\\workspace\\projects\\meta\\replica\\src\\replica.js',
-//   'src/index.js',
+//   'src/main.js',
 //   '-i',
-//   'index.html'];
+//   'index.html', "-u"];
 
 cli.name(package.name)
    .version(package.version)
@@ -543,27 +543,3 @@ cli.name(package.name)
    .command("make <dir> [template]", "Create and prepare an empty project", makeProject)
    .command("v", "\tPrints current version", printVersion)
    .parse(process.argv, run);
-
-// function removeSource(input, src)
-// {
-// 	if(!input.sources[src]) { return; }
-
-// 	delete input.sources[src];
-// 	needUpdate.indexFile = true;
-// }
-
-// function removeDirectory(input, src)
-// {
-// 	let watchFunc = watching[src];
-// 	if(!watchFunc) { return; }
-
-// 	watchFunc.close();
-// 	delete watching[src];
-
-// 	for(var key in input.sources) 
-// 	{
-// 		if(key.indexOf(src) === 0) {
-// 			removeSource(input, key);
-// 		}
-// 	}
-// }
