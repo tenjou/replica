@@ -1212,9 +1212,8 @@ const compile =
 			}
 
 			result += quasis[num].value
+			result += "\""
 		}
-
-		result += "\""
 
 		return result
 	},
