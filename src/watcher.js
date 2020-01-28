@@ -15,17 +15,15 @@ class WatchFile
 
 class WatchDirectory
 {
-    constructor(src, handle) 
+    constructor(src) 
     {
         this.src = src;
-        this.handle = handle;
-
         this.files = {};
         this.count = 0;
     }
 
     destroy() {
-        this.handle.close();
+        fs.unwatch(this.src)
         delete this.watchingDirs[this.src];
     }
 
@@ -70,23 +68,21 @@ function watchFile(file)
     {
         const slash = path.normalize("/");
 
-        let handle = new FSEvent();
-
-        dir = new WatchDirectory(file.rootPath, handle);
+        dir = new WatchDirectory(file.rootPath);
         watchingDirs[file.rootPath] = dir;
 
-        handle.onchange = function(status, eventType, filename) {
-            if(filename[0] === slash) {
-                filename = filename.slice(1);
-            }
-            watchDirectoryFunc(eventType, dir, filename);
-        };
-        handle.start(file.rootPath);
-
+		fs.watch(file.rootPath, { encoding: "utf8" }, (eventType, filename) => {
+			if(filename && eventType === "change") {
+				if(filename[0] === slash) {
+					filename = filename.slice(1);
+				}
+				watchDirectoryFunc(eventType, dir, filename)
+			}
+		})
         // console.log("WATCH_DIR:", file.rootPath);
     }
 
-    dir.watchFile(file);
+    // dir.watchFile(file);
 }
 
 function unwatchFile(file)
